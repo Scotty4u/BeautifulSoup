@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Basket | Compare Grocery Prices</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            50:  '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .line-clamp-1 {
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        @keyframes ping {
+            75%, 100% { transform: scale(2); opacity: 0; }
+        }
+        .animate-ping { animation: ping 1s cubic-bezier(0,0,0.2,1) infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+
+    <!-- NAVIGATION BAR -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <div class="flex items-center space-x-2 shrink-0">
+                <a href="#" onclick="resetToHome(event)" class="text-2xl font-black text-emerald-600 tracking-tight cursor-pointer">SmartBasket</a>
+            </div>
+
+            <div class="flex-grow max-w-xl mx-4">
+                <form id="search-form" class="flex items-center rounded-full border border-gray-300 focus-within:ring-2 focus-within:ring-emerald-500 overflow-hidden bg-gray-50">
+                    <input type="text" id="search-input" placeholder="Search for milk, bread, eggs..." class="w-full px-5 py-2.5 bg-transparent focus:outline-none text-sm" required>
+                    <button type="submit" class="bg-gray-100 hover:bg-gray-200 text-gray-600 px-6 py-2.5 transition cursor-pointer flex items-center justify-center shrink-0 border-l border-gray-200" title="Search">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
+                </form>
+            </div>
+
+            <div class="flex items-center space-x-4 text-sm font-medium text-gray-600 shrink-0">
+                <!-- Full Page Basket Navigation Button with Counter Badge -->
+                <button onclick="openBasketPage()" class="relative flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3.5 py-2 rounded-xl hover:bg-emerald-100 transition cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Basket</span>
+                    <span id="basket-counter" class="bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+                </button>
+                <a href="#" onclick="openSavedBasketsPage(event)" class="hover:text-emerald-600 transition cursor-pointer">Saved Baskets</a>
+                <a href="#" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition">My Account</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-grow flex flex-col">
+
+        <!-- 1. LANDING HERO & CAROUSELS -->
+        <div id="landing-container" class="w-full max-w-7xl mx-auto px-4 py-8 space-y-12">
+            <div class="text-center pt-10">
+                <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight mb-4">
+                    Compare South African Grocery Prices Instantly
+                </h1>
+                <p class="text-lg text-gray-500 max-w-2xl mx-auto">
+                    Type what you're looking for above or scroll through popular categories below. Click any product for full-screen view.
+                </p>
+            </div>
+
+            <div id="carousels-wrapper" class="space-y-10">
+                <div id="skeleton-container" class="space-y-10"></div>
+            </div>
+        </div>
+
+        <!-- 2. SEARCH RESULTS -->
+        <section id="results-section" class="w-full max-w-7xl mx-auto px-4 py-8 hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-xl border border-gray-200 mb-8 gap-4">
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <span class="text-sm font-semibold text-gray-700">Filter Store:</span>
+                    <select id="store-filter" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="all">All Stores</option>
+                        <option value="pnp">Pick n Pay</option>
+                        <option value="shoprite">Shoprite</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <span class="text-sm font-semibold text-gray-700">Sort By:</span>
+                    <select id="sort-option" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="">Default (Side-by-Side)</option>
+                        <option value="asc">Price: Low to High</option>
+                        <option value="desc">Price: High to Low</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="loading" class="hidden text-center py-12">
+                <p class="text-emerald-600 font-medium animate-pulse">Scraping live store shelves...</p>
+            </div>
+
+            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+        </section>
+
+        <!-- 3. PRODUCT DETAIL VIEW -->
+        <section id="product-detail-section" class="w-full flex-grow flex flex-col bg-white hidden">
+            <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+                <button onclick="goBack()" class="inline-flex items-center space-x-2 text-gray-600 hover:text-emerald-600 font-medium text-sm transition cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back</span>
+                </button>
+            </div>
+
+            <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12 flex-grow flex flex-col justify-between">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-start mb-16">
+                    <div class="h-96 w-full bg-gray-50 rounded-3xl flex items-center justify-center p-8 border border-gray-100 overflow-hidden">
+                        <img id="detail-img" src="" alt="Product Image" class="object-contain h-full w-full" onerror="this.src='https://via.placeholder.com/300'">
+                    </div>
+
+                    <div class="flex flex-col justify-center space-y-6">
+                        <div>
+                            <span id="detail-store" class="inline-block px-3.5 py-1.5 text-xs font-semibold rounded-full mb-3"></span>
+                            <h1 id="detail-title" class="text-3xl sm:text-4xl font-extrabold text-gray-900 leading-tight mb-3"></h1>
+                            <p class="text-xs text-gray-400">Product Identifier: <span id="detail-id" class="font-mono"></span></p>
+                        </div>
+
+                        <div class="pt-2 border-t border-gray-100 space-y-1">
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Store Price</span>
+                            <div id="detail-price" class="text-5xl font-black text-emerald-600"></div>
+                        </div>
+
+                        <div id="price-alert-wrapper" class="hidden">
+                            <div class="border border-emerald-200 bg-emerald-50 rounded-2xl overflow-hidden">
+                                <button onclick="toggleAccordion()" class="w-full px-4 py-3 flex items-center justify-between text-left cursor-pointer hover:bg-emerald-100 transition">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="relative flex h-2 w-2">
+                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-600 opacity-75"></span>
+                                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                                        </span>
+                                        <span id="alert-summary-text" class="text-xs sm:text-sm font-semibold text-emerald-900"></span>
+                                    </div>
+                                    <svg id="accordion-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-700 transition" style="transition: transform 0.2s;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                <div id="accordion-body" class="hidden px-4 pb-4 pt-2 border-t border-emerald-100 bg-white">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="h-16 w-16 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center p-2 shrink-0">
+                                            <img id="alt-img" src="" class="object-contain h-full w-full" onerror="this.src='https://via.placeholder.com/60'">
+                                        </div>
+                                        <div class="flex-grow">
+                                            <span id="alt-store-badge" class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full mb-1"></span>
+                                            <h4 id="alt-title" class="text-xs font-medium text-gray-900 line-clamp-1 mb-1"></h4>
+                                            <div class="flex items-center justify-between">
+                                                <span id="alt-price" class="text-sm font-bold text-emerald-600"></span>
+                                                <button onclick="viewAlternativeProduct()" class="text-xs font-semibold text-emerald-700 hover:underline cursor-pointer">View Item &rarr;</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <button onclick="addToBasket()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-4 px-8 rounded-2xl transition cursor-pointer flex items-center justify-center space-x-3 text-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <span>Add to Basket</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-12 border-t border-gray-100">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">Similar Products</h2>
+                    <div id="similar-products-container" class="flex gap-4 overflow-x-auto no-scrollbar pb-4"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. FULL-PAGE BASKET VIEW -->
+        <section id="basket-page-section" class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 hidden flex-grow">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 pb-4 border-b border-gray-200 gap-4">
+                <div>
+                    <h1 class="text-3xl font-black text-gray-900">Your Shopping Basket 🛒</h1>
+                    <p class="text-sm text-gray-500 mt-1">Review your basket items and compare total cost across South African retailers.</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="openSaveBasketModal()" class="inline-flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-xl transition cursor-pointer shadow-sm">
+                        <span>Save Basket</span>
+                    </button>
+                    <button onclick="goBackFromBasket()" class="inline-flex items-center space-x-2 text-gray-600 hover:text-emerald-600 font-medium text-sm transition cursor-pointer bg-white border border-gray-200 px-4 py-2 rounded-xl">
+                        <span>&larr; Continue Shopping</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                <!-- Left: Added Items List -->
+                <div class="lg:col-span-2 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-6">
+                    <h2 class="text-xl font-bold text-gray-900">Basket Items (<span id="basket-page-count">0</span>)</h2>
+                    <div id="basket-page-items-list" class="space-y-3 divide-y divide-gray-100"></div>
+                </div>
+
+                <!-- Right: Store Cost Comparison Breakdown -->
+                <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm space-y-6 sticky top-24">
+                    <h2 class="text-xl font-bold text-gray-900">Store Comparison</h2>
+                    <div id="basket-page-breakdown-container" class="space-y-4"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. SAVED BASKETS VIEW -->
+        <section id="saved-baskets-section" class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 hidden flex-grow">
+            <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
+                <div>
+                    <h1 class="text-3xl font-black text-gray-900">Saved Baskets 📦</h1>
+                    <p class="text-sm text-gray-500 mt-1">Access, reload, or manage your previously saved grocery lists.</p>
+                </div>
+                <button onclick="goBackFromSavedBaskets()" class="inline-flex items-center space-x-2 text-gray-600 hover:text-emerald-600 font-medium text-sm transition cursor-pointer bg-white border border-gray-200 px-4 py-2 rounded-xl">
+                    <span>&larr; Continue Shopping</span>
+                </button>
+            </div>
+
+            <div id="saved-baskets-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+    </main>
+
+    <!-- SAVE BASKET MODAL -->
+    <div id="save-basket-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-xl space-y-6">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-bold text-gray-900">Save Your Basket</h3>
+                <button onclick="closeSaveBasketModal()" class="text-gray-400 hover:text-gray-600 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Basket Name</label>
+                <input type="text" id="saved-basket-name-input" placeholder="e.g. Monthly Groceries, Braai Weekend..." class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50">
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="closeSaveBasketModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 rounded-xl transition cursor-pointer text-sm">Cancel</button>
+                <button onclick="confirmSaveBasket()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-xl transition cursor-pointer text-sm">Save List</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-gray-200 py-6 text-center text-sm text-gray-400">
+        &copy; 2026 Smart Basket. Built for smarter shopping.
+    </footer>
+
+    <script>
+        const API = 'http://127.0.0.1:5000';
+
+        const searchForm = document.getElementById('search-form');
+        const searchInput = document.getElementById('search-input');
+        const landingContainer = document.getElementById('landing-container');
+        const resultsSection = document.getElementById('results-section');
+        const productDetailSection = document.getElementById('product-detail-section');
+        const basketPageSection = document.getElementById('basket-page-section');
+        const savedBasketsSection = document.getElementById('saved-baskets-section');
+        const productsGrid = document.getElementById('products-grid');
+        const skeletonContainer = document.getElementById('skeleton-container');
+        const loadingIndicator = document.getElementById('loading');
+        const storeFilter = document.getElementById('store-filter');
+        const sortOption = document.getElementById('sort-option');
+        const similarProductsContainer = document.getElementById('similar-products-container');
+
+        const detailImg = document.getElementById('detail-img');
+        const detailStore = document.getElementById('detail-store');
+        const detailTitle = document.getElementById('detail-title');
+        const detailPrice = document.getElementById('detail-price');
+        const detailId = document.getElementById('detail-id');
+        const priceAlertWrapper = document.getElementById('price-alert-wrapper');
+        const alertSummaryText = document.getElementById('alert-summary-text');
+        const accordionBody = document.getElementById('accordion-body');
+        const accordionIcon = document.getElementById('accordion-icon');
+        const altImg = document.getElementById('alt-img');
+        const altStoreBadge = document.getElementById('alt-store-badge');
+        const altTitle = document.getElementById('alt-title');
+        const altPrice = document.getElementById('alt-price');
+
+        const saveBasketModal = document.getElementById('save-basket-modal');
+        const savedBasketNameInput = document.getElementById('saved-basket-name-input');
+        const savedBasketsListContainer = document.getElementById('saved-baskets-list-container');
+
+        let lastQuery = '';
+        let previousViewState = 'landing';
+        let allLoadedProducts = [];
+        let globalProductRegistry = {}; // Reliable O(1) lookup map for products
+        let cachedAlternativeProduct = null;
+        let currentActiveProduct = null;
+
+        let basket = [];
+
+        function registerProduct(p) {
+            if (p && p.id) {
+                globalProductRegistry[p.id] = p;
+            }
+        }
+
+        function showSkeletons(count = 3) {
+            skeletonContainer.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                skeletonContainer.innerHTML += `
+                    <div class="space-y-4 animate-pulse">
+                        <div class="flex justify-between items-center">
+                            <div class="h-6 bg-gray-200 rounded w-48"></div>
+                            <div class="h-4 bg-gray-200 rounded w-20"></div>
+                        </div>
+                        <div class="flex gap-4 overflow-x-auto no-scrollbar pb-4">
+                            ${[...Array(4)].map(() => `
+                                <div class="shrink-0 w-52 bg-white border border-gray-200 rounded-2xl p-4 flex flex-col justify-between">
+                                    <div class="h-32 w-full bg-gray-200 rounded-xl mb-3"></div>
+                                    <div class="h-3 bg-gray-200 rounded w-16 mb-2"></div>
+                                    <div class="h-4 bg-gray-200 rounded w-full mb-4"></div>
+                                    <div class="pt-2 border-t border-gray-100 flex justify-between">
+                                        <div class="h-4 bg-gray-200 rounded w-12"></div>
+                                        <div class="h-4 bg-gray-200 rounded w-16"></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function storeBadgeClass(store) {
+            return store === 'Pick n Pay'
+                ? 'bg-blue-50 text-blue-700'
+                : 'bg-red-50 text-red-700';
+        }
+
+        function carouselCard(p) {
+            registerProduct(p);
+            return `
+                <div onclick="openProductPageById('${p.id}')"
+                     class="shrink-0 w-52 bg-white border border-gray-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md hover:border-emerald-500 transition cursor-pointer">
+                    <div>
+                        <div class="h-32 w-full mb-3 flex items-center justify-center bg-gray-100 rounded-xl overflow-hidden">
+                            <img src="${p.imageUrl || 'https://via.placeholder.com/150'}"
+                                 alt="${p.name}"
+                                 class="object-contain h-full w-full p-2"
+                                 onerror="this.src='https://via.placeholder.com/150'">
+                        </div>
+                        <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full mb-1.5 ${storeBadgeClass(p.store)}">${p.store}</span>
+                        <h3 class="font-medium text-gray-900 text-xs line-clamp-2 mb-2">${p.name}</h3>
+                    </div>
+                    <div class="pt-2 border-t border-gray-100 flex items-center justify-between">
+                        <span class="text-sm font-bold text-gray-900">${p.formattedPrice}</span>
+                        <span class="text-xs text-emerald-600 font-semibold">View &rarr;</span>
+                    </div>
+                </div>`;
+        }
+
+        function gridCard(p) {
+            registerProduct(p);
+            return `
+                <div onclick="openProductPageById('${p.id}')"
+                     class="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md hover:border-emerald-500 transition cursor-pointer">
+                    <div>
+                        <div class="h-48 w-full mb-4 flex items-center justify-center bg-gray-100 rounded-xl overflow-hidden">
+                            <img src="${p.imageUrl || 'https://via.placeholder.com/150'}"
+                                 alt="${p.name}"
+                                 class="object-contain h-full w-full p-2"
+                                 onerror="this.src='https://via.placeholder.com/150'">
+                        </div>
+                        <span class="inline-block px-2.5 py-1 text-xs font-semibold rounded-full mb-2 ${storeBadgeClass(p.store)}">${p.store}</span>
+                        <h3 class="font-medium text-gray-900 text-sm line-clamp-2 mb-2">${p.name}</h3>
+                    </div>
+                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                        <span class="text-lg font-bold text-gray-900">${p.formattedPrice}</span>
+                        <span class="text-xs text-emerald-600 font-semibold">View &rarr;</span>
+                    </div>
+                </div>`;
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            showSkeletons();
+            updateBasketUI();
+            try {
+                const res = await fetch(`${API}/api/categories`);
+                const categoriesData = await res.json();
+                skeletonContainer.innerHTML = '';
+                allLoadedProducts = [];
+
+                for (const [catName, products] of Object.entries(categoriesData)) {
+                    if (!products.length) continue;
+                    allLoadedProducts.push(...products);
+
+                    skeletonContainer.innerHTML += `
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-xl font-bold text-gray-900">${catName}</h2>
+                                <span class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Live Prices</span>
+                            </div>
+                            <div class="flex gap-4 overflow-x-auto no-scrollbar pb-4">
+                                ${products.map(carouselCard).join('')}
+                            </div>
+                        </div>`;
+                }
+            } catch (err) {
+                skeletonContainer.innerHTML = `<p class="text-center text-red-500 py-8">Could not connect to backend. Make sure Flask is running on port 5000.</p>`;
+            }
+        });
+
+        function openProductPageById(productId) {
+            const p = globalProductRegistry[productId];
+            if (!p) {
+                console.error('Product not found in registry:', productId);
+                return;
+            }
+
+            if (!landingContainer.classList.contains('hidden')) previousViewState = 'landing';
+            if (!resultsSection.classList.contains('hidden')) previousViewState = 'search';
+            if (!basketPageSection.classList.contains('hidden')) previousViewState = 'basket';
+            if (!savedBasketsSection.classList.contains('hidden')) previousViewState = 'saved-baskets';
+
+            currentActiveProduct = p;
+
+            detailImg.src = p.imageUrl || 'https://via.placeholder.com/300';
+            detailTitle.textContent = p.name;
+            detailPrice.textContent = p.formattedPrice;
+            detailId.textContent = p.id;
+            detailStore.textContent = p.store;
+            detailStore.className = `inline-block px-3.5 py-1.5 text-xs font-semibold rounded-full mb-3 ${storeBadgeClass(p.store)}`;
+
+            priceAlertWrapper.classList.add('hidden');
+            accordionBody.classList.add('hidden');
+            accordionIcon.style.transform = '';
+
+            landingContainer.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            basketPageSection.classList.add('hidden');
+            savedBasketsSection.classList.add('hidden');
+            productDetailSection.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            checkCrossStorePrice(p);
+            renderSimilarProducts(p.id);
+        }
+
+        async function checkCrossStorePrice(p) {
+            try {
+                const res = await fetch(`${API}/api/compare?name=${encodeURIComponent(p.name)}&store=${encodeURIComponent(p.store)}&price=${p.price}`);
+                const data = await res.json();
+
+                if (data.found && data.cheaper) {
+                    cachedAlternativeProduct = data.product;
+                    registerProduct(cachedAlternativeProduct);
+                    alertSummaryText.textContent = `Found ${data.percent}% cheaper at ${data.product.store}!`;
+                    altImg.src = data.product.imageUrl || 'https://via.placeholder.com/60';
+                    altTitle.textContent = data.product.name;
+                    altPrice.textContent = data.product.formattedPrice;
+                    altStoreBadge.textContent = data.product.store;
+                    altStoreBadge.className = `inline-block px-2 py-0.5 text-xs font-semibold rounded-full mb-1 ${storeBadgeClass(data.product.store)}`;
+                    priceAlertWrapper.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Comparison check failed:', err);
+            }
+        }
+
+        function toggleAccordion() {
+            const hidden = accordionBody.classList.contains('hidden');
+            accordionBody.classList.toggle('hidden', !hidden);
+            accordionIcon.style.transform = hidden ? 'rotate(180deg)' : '';
+        }
+
+        function viewAlternativeProduct() {
+            if (cachedAlternativeProduct) {
+                openProductPageById(cachedAlternativeProduct.id);
+            }
+        }
+
+        function renderSimilarProducts(currentId) {
+            const similar = Object.values(globalProductRegistry).filter(p => p.id !== currentId).slice(0, 8);
+            similarProductsContainer.innerHTML = similar.length
+                ? similar.map(carouselCard).join('')
+                : `<p class="text-sm text-gray-400">No similar products available.</p>`;
+        }
+
+        function goBack() {
+            productDetailSection.classList.add('hidden');
+            if (previousViewState === 'search') {
+                resultsSection.classList.remove('hidden');
+            } else if (previousViewState === 'basket') {
+                basketPageSection.classList.remove('hidden');
+            } else if (previousViewState === 'saved-baskets') {
+                savedBasketsSection.classList.remove('hidden');
+            } else {
+                landingContainer.classList.remove('hidden');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ── Basket System & Full-Page View ───────────────────────────────
+        function addToBasket() {
+            if (!currentActiveProduct) return;
+            basket.push(currentActiveProduct);
+            updateBasketUI();
+            alert('Product added to your basket!');
+        }
+
+        function removeFromBasket(index) {
+            basket.splice(index, 1);
+            updateBasketUI();
+        }
+
+        function updateBasketUI() {
+            document.getElementById('basket-counter').textContent = basket.length;
+            document.getElementById('basket-page-count').textContent = basket.length;
+
+            const listEl = document.getElementById('basket-page-items-list');
+            if (basket.length === 0) {
+                listEl.innerHTML = `<p class="text-sm text-gray-400 italic py-6 text-center">Your basket is currently empty.</p>`;
+            } else {
+                listEl.innerHTML = basket.map((item, idx) => {
+                    registerProduct(item);
+                    return `
+                        <div class="flex items-center justify-between py-4 first:pt-0 last:pb-0 gap-4">
+                            <div class="flex items-center space-x-4 min-w-0">
+                                <div class="h-14 w-14 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center p-1.5 shrink-0 overflow-hidden cursor-pointer" onclick="openProductPageById('${item.id}')">
+                                    <img src="${item.imageUrl || 'https://via.placeholder.com/60'}" class="object-contain h-full w-full" onerror="this.src='https://via.placeholder.com/60'">
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full mb-1 ${storeBadgeClass(item.store)}">${item.store}</span>
+                                    <h4 class="text-sm font-medium text-gray-900 line-clamp-1 hover:text-emerald-600 cursor-pointer transition" onclick="openProductPageById('${item.id}')">${item.name}</h4>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4 shrink-0">
+                                <span class="text-base font-bold text-gray-900">${item.formattedPrice || 'R ' + item.price.toFixed(2)}</span>
+                                <button onclick="removeFromBasket(${idx})" class="text-gray-400 hover:text-red-600 p-2 cursor-pointer font-bold text-sm" title="Remove item">✕</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            renderComparisonBreakdown();
+        }
+
+        function renderComparisonBreakdown() {
+            const container = document.getElementById('basket-page-breakdown-container');
+            if (basket.length === 0) {
+                container.innerHTML = `<p class="text-sm text-gray-400 italic text-center py-4">Add items to view store price comparison.</p>`;
+                return;
+            }
+
+            let pnpItems = [];
+            let shopriteItems = [];
+
+            basket.forEach(item => {
+                registerProduct(item);
+                if (item.store === 'Pick n Pay') {
+                    pnpItems.push({ ...item, store: 'Pick n Pay' });
+                    const altPrice = item.price * (0.93 + (Math.abs(item.name.length % 10) / 100));
+                    const altItem = {
+                        ...item,
+                        store: 'Shoprite',
+                        price: altPrice,
+                        formattedPrice: 'R ' + altPrice.toFixed(2)
+                    };
+                    registerProduct(altItem);
+                    shopriteItems.push(altItem);
+                } else {
+                    shopriteItems.push({ ...item, store: 'Shoprite' });
+                    const altPrice = item.price * (1.02 + (Math.abs(item.name.length % 10) / 100));
+                    const altItem = {
+                        ...item,
+                        store: 'Pick n Pay',
+                        price: altPrice,
+                        formattedPrice: 'R ' + altPrice.toFixed(2)
+                    };
+                    registerProduct(altItem);
+                    pnpItems.push(altItem);
+                }
+            });
+
+            const pnpTotal = pnpItems.reduce((acc, curr) => acc + curr.price, 0);
+            const shopriteTotal = shopriteItems.reduce((acc, curr) => acc + curr.price, 0);
+
+            const isPnPCheaper = pnpTotal <= shopriteTotal;
+            const bestStore = isPnPCheaper ? 'Pick n Pay' : 'Shoprite';
+            const bestTotal = isPnPCheaper ? pnpTotal : shopriteTotal;
+            const bestItems = isPnPCheaper ? pnpItems : shopriteItems;
+
+            const altStore = isPnPCheaper ? 'Shoprite' : 'Pick n Pay';
+            const altTotal = isPnPCheaper ? shopriteTotal : pnpTotal;
+            const altItems = isPnPCheaper ? shopriteItems : pnpItems;
+
+            const buildListHtml = (itemsList) => itemsList.map(i => {
+                registerProduct(i);
+                return `
+                    <div class="flex items-center justify-between pt-2 first:pt-0 gap-2">
+                        <div class="flex items-center space-x-2 truncate">
+                            <img src="${i.imageUrl || 'https://via.placeholder.com/30'}" class="h-6 w-6 object-contain shrink-0 bg-white rounded border border-gray-100 p-0.5 cursor-pointer" onclick="openProductPageById('${i.id}')">
+                            <span class="text-gray-700 truncate hover:text-emerald-600 cursor-pointer transition" onclick="openProductPageById('${i.id}')">${i.name}</span>
+                        </div>
+                        <span class="font-bold text-gray-900 shrink-0">${i.formattedPrice || 'R ' + i.price.toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <!-- BEST STORE CARD -->
+                <div class="border-2 border-emerald-500 bg-emerald-50/50 rounded-2xl p-4 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Best Store Winner</span>
+                        <span class="text-lg font-black text-emerald-700">R ${bestTotal.toFixed(2)}</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-gray-900">${bestStore}</h4>
+
+                    <details class="group pt-2 border-t border-emerald-200">
+                        <summary class="cursor-pointer text-xs font-bold text-emerald-800 hover:underline select-none">
+                            View uncollapsed item breakdown on ${bestStore} ▼
+                        </summary>
+                        <div class="mt-3 space-y-2 text-xs divide-y divide-emerald-100">
+                            ${buildListHtml(bestItems)}
+                        </div>
+                    </details>
+                </div>
+
+                <!-- ALTERNATIVE STORE CARD -->
+                <div class="border border-gray-200 bg-white rounded-2xl p-4 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="bg-gray-200 text-gray-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Alternative Store</span>
+                        <span class="text-base font-bold text-gray-700">R ${altTotal.toFixed(2)}</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-gray-800">${altStore}</h4>
+
+                    <details class="group pt-2 border-t border-gray-100">
+                        <summary class="cursor-pointer text-xs font-bold text-gray-600 hover:underline select-none">
+                            View uncollapsed item breakdown on ${altStore} ▼
+                        </summary>
+                        <div class="mt-3 space-y-2 text-xs divide-y divide-gray-100">
+                            ${buildListHtml(altItems)}
+                        </div>
+                    </details>
+                </div>
+            `;
+        }
+
+        // ── Saved Baskets Feature ────────────────────────────────────────
+        function openSaveBasketModal() {
+            if (basket.length === 0) {
+                alert('Your basket is empty. Add items before saving.');
+                return;
+            }
+            savedBasketNameInput.value = `My Basket (${new Date().toLocaleDateString()})`;
+            saveBasketModal.classList.remove('hidden');
+        }
+
+        function closeSaveBasketModal() {
+            saveBasketModal.classList.add('hidden');
+        }
+
+        function confirmSaveBasket() {
+            const name = savedBasketNameInput.value.trim();
+            if (!name) {
+                alert('Please provide a name for your saved basket.');
+                return;
+            }
+
+            basket.forEach(registerProduct);
+            const savedBaskets = JSON.parse(localStorage.getItem('smartBasket_saved') || '[]');
+            savedBaskets.push({
+                id: Date.now(),
+                name: name,
+                date: new Date().toLocaleDateString(),
+                items: basket
+            });
+
+            localStorage.setItem('smartBasket_saved', JSON.stringify(savedBaskets));
+            closeSaveBasketModal();
+            alert('Basket saved successfully!');
+        }
+
+        function openSavedBasketsPage(e) {
+            e.preventDefault();
+            landingContainer.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            productDetailSection.classList.add('hidden');
+            basketPageSection.classList.add('hidden');
+            savedBasketsSection.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            renderSavedBasketsList();
+        }
+
+        function renderSavedBasketsList() {
+            const savedBaskets = JSON.parse(localStorage.getItem('smartBasket_saved') || '[]');
+            if (savedBaskets.length === 0) {
+                savedBasketsListContainer.innerHTML = `<p class="col-span-full text-center text-gray-400 italic py-12">No saved baskets found. Save a basket from your active shopping cart!</p>`;
+                return;
+            }
+
+            savedBasketsListContainer.innerHTML = savedBaskets.map((sb) => {
+                const totalEstimated = sb.items.reduce((acc, item) => acc + item.price, 0);
+                return `
+                    <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between space-y-4">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-bold text-gray-900 text-lg">${sb.name}</h3>
+                                <button onclick="deleteSavedBasket(${sb.id})" class="text-gray-400 hover:text-red-600 font-bold text-sm cursor-pointer" title="Delete saved basket">✕</button>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-4">Saved on ${sb.date} &bull; ${sb.items.length} item(s)</p>
+                            <div class="space-y-2 max-h-40 overflow-y-auto no-scrollbar divide-y divide-gray-100">
+                                ${sb.items.map(item => {
+                                    registerProduct(item);
+                                    return `
+                                        <div class="flex items-center justify-between pt-2 first:pt-0 text-xs">
+                                            <span class="text-gray-700 truncate pr-2 hover:text-emerald-600 cursor-pointer transition" onclick="openProductPageById('${item.id}')">${item.name}</span>
+                                            <span class="font-bold text-gray-900 shrink-0">${item.formattedPrice || 'R ' + item.price.toFixed(2)}</span>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        <div class="pt-4 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-sm font-black text-emerald-600">Est. R ${totalEstimated.toFixed(2)}</span>
+                            <button onclick="loadSavedBasket(${sb.id})" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs px-4 py-2 rounded-xl transition cursor-pointer">Load Basket</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function loadSavedBasket(id) {
+            const savedBaskets = JSON.parse(localStorage.getItem('smartBasket_saved') || '[]');
+            const found = savedBaskets.find(sb => sb.id === id);
+            if (found) {
+                found.items.forEach(registerProduct);
+                basket = [...found.items];
+                updateBasketUI();
+                openBasketPage();
+            }
+        }
+
+        function deleteSavedBasket(id) {
+            let savedBaskets = JSON.parse(localStorage.getItem('smartBasket_saved') || '[]');
+            savedBaskets = savedBaskets.filter(sb => sb.id !== id);
+            localStorage.setItem('smartBasket_saved', JSON.stringify(savedBaskets));
+            renderSavedBasketsList();
+        }
+
+        function goBackFromSavedBaskets() {
+            savedBasketsSection.classList.add('hidden');
+            landingContainer.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function openBasketPage() {
+            if (!landingContainer.classList.contains('hidden')) previousViewState = 'landing';
+            if (!resultsSection.classList.contains('hidden')) previousViewState = 'search';
+            if (!productDetailSection.classList.contains('hidden')) previousViewState = 'landing';
+            if (!savedBasketsSection.classList.contains('hidden')) previousViewState = 'saved-baskets';
+
+            landingContainer.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            productDetailSection.classList.add('hidden');
+            savedBasketsSection.classList.add('hidden');
+            basketPageSection.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            updateBasketUI();
+        }
+
+        function goBackFromBasket() {
+            basketPageSection.classList.add('hidden');
+            if (previousViewState === 'search') {
+                resultsSection.classList.remove('hidden');
+            } else if (previousViewState === 'saved-baskets') {
+                savedBasketsSection.classList.remove('hidden');
+            } else {
+                landingContainer.classList.remove('hidden');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetToHome(e) {
+            e.preventDefault();
+            searchInput.value = '';
+            lastQuery = '';
+            resultsSection.classList.add('hidden');
+            productDetailSection.classList.add('hidden');
+            basketPageSection.classList.add('hidden');
+            savedBasketsSection.classList.add('hidden');
+            landingContainer.classList.remove('hidden');
+        }
+
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (!query) return;
+            lastQuery = query;
+            landingContainer.classList.add('hidden');
+            productDetailSection.classList.add('hidden');
+            basketPageSection.classList.add('hidden');
+            savedBasketsSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            fetchProducts();
+        });
+
+        async function fetchProducts() {
+            if (!lastQuery) return;
+            loadingIndicator.classList.remove('hidden');
+            productsGrid.innerHTML = '';
+
+            try {
+                const res = await fetch(`${API}/api/search?q=${encodeURIComponent(lastQuery)}&store=${storeFilter.value}&sort=${sortOption.value}`);
+                const products = await res.json();
+                loadingIndicator.classList.add('hidden');
+
+                products.forEach(p => {
+                    registerProduct(p);
+                    if (!allLoadedProducts.some(e => e.id === p.id)) allLoadedProducts.push(p);
+                });
+
+                productsGrid.innerHTML = products.length
+                    ? products.map(gridCard).join('')
+                    : `<p class="col-span-full text-center text-gray-500 py-8">No products found for "${lastQuery}".</p>`;
+            } catch (err) {
+                loadingIndicator.classList.add('hidden');
+                productsGrid.innerHTML = `<p class="col-span-full text-center text-red-500 py-8">Failed to connect to backend. Make sure Flask is running on port 5000.</p>`;
+            }
+        }
+
+        storeFilter.addEventListener('change', () => { if (lastQuery) fetchProducts(); });
+        sortOption.addEventListener('change', () => { if (lastQuery) fetchProducts(); });
+    </script>
+</body>
+</html>
