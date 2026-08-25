@@ -212,7 +212,133 @@ def scrape_shoprite(query: str):
 
 
 # ==========================================
-# 3. SEARCH ENDPOINT
+# 3. CHECKERS SCRAPER (WAF-Resilient)
+# ==========================================
+def extract_checkers_image(item: dict) -> str:
+    raw_img = ''
+    if item.get('imageId'):
+        raw_img = item.get('imageId')
+    elif item.get('images') and isinstance(item['images'], list) and len(item['images']) > 0:
+        first = item['images'][0]
+        if isinstance(first, dict):
+            raw_img = (
+                first.get('id')
+                or first.get('fileId')
+                or first.get('url')
+                or first.get('src')
+                or ''
+            )
+        elif isinstance(first, str):
+            raw_img = first
+    elif item.get('image'):
+        raw_img = item.get('image')
+    elif item.get('imageUrl'):
+        raw_img = item.get('imageUrl')
+
+    if not raw_img:
+        return ''
+
+    raw_img = str(raw_img).strip()
+    if raw_img.startswith('http://') or raw_img.startswith('https://'):
+        return raw_img
+    if raw_img.startswith('//'):
+        return f'https:{raw_img}'
+    if '/' in raw_img:
+        raw_img = raw_img.split('/')[-1]
+    raw_img = raw_img.split('?')[0]
+
+    return f'https://catalog.sixty60.co.za/v2/files/{raw_img}?width=400&height=400'
+
+
+def scrape_checkers(query: str):
+    cached_data, is_fresh = get_cached_data('checkers', query)
+    if is_fresh:
+        print(f"[CACHE HIT] Returning fresh Checkers results for '{query}'")
+        return cached_data
+
+    headers = {
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        ),
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': f'https://www.checkers.co.za/search?Search={query}',
+        'Content-Type': 'application/json',
+        'Origin': 'https://www.checkers.co.za',
+    }
+
+    json_data = {
+        'storeContexts': [],
+        'filterData': {
+            'filter': {
+                'showAllDisplayVariants': False,
+                'showNotRangedProducts': False,
+                'productListSource': {
+                    'search': query,
+                },
+                'paginationOptions': {
+                    'page': 0,
+                    'pageSize': 36,
+                },
+                'filterOptions': {
+                    'filterIds': [],
+                    'dealsOnly': False,
+                    'brandOptions': [],
+                    'departmentOptions': [],
+                    'serviceOptions': [],
+                    'facetOptions': [],
+                },
+                'sortOptions': None,
+            },
+            'displayOptions': {
+                'includeDisplayCategoryTree': True,
+            },
+        },
+        'forYouBonusBuyIds': [],
+    }
+
+    try:
+        print(f"[LIVE FETCH] Scraping Checkers for '{query}'")
+        res = requests.post(
+            'https://www.checkers.co.za/api/catalogue/get-products-filter',
+            headers=headers,
+            json=json_data,
+            impersonate='chrome120',
+            timeout=10,
+        )
+        if res.status_code == 200:
+            data = res.json()
+            products = data.get('products', []) or data.get('filterResult', {}).get('products', [])
+
+            extracted = []
+            for item in products:
+                raw_price = item.get('price', 0.0)
+                if isinstance(raw_price, dict):
+                    raw_price = raw_price.get('value', 0.0)
+
+                extracted.append({
+                    'id': f"checkers_{item.get('code', item.get('id', ''))}",
+                    'name': item.get('name', item.get('title', '')),
+                    'store': 'Checkers',
+                    'price': float(raw_price),
+                    'formattedPrice': f"R {float(raw_price):.2f}",
+                    'imageUrl': extract_checkers_image(item),
+                })
+            save_to_cache('checkers', query, extracted)
+            return extracted
+    except Exception as e:
+        print(f'Checkers Scraper Error: {e}')
+
+    if cached_data is not None:
+        print(f"[CACHE FALLBACK] Returning stale Checkers data for '{query}'")
+        return cached_data
+
+    return []
+
+
+# ==========================================
+# 4. SEARCH ENDPOINT
 # ==========================================
 @app.route('/api/search', methods=['GET'])
 def handle_search():
@@ -225,31 +351,36 @@ def handle_search():
 
     pnp_results = []
     shoprite_results = []
+    checkers_results = []
 
     run_pnp = store_filter in ['all', 'pnp', 'pick n pay', 'picknpay']
     run_shoprite = store_filter in ['all', 'shoprite']
+    run_checkers = store_filter in ['all', 'checkers']
 
-    if run_pnp and run_shoprite:
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future_pnp = executor.submit(scrape_pnp, query)
-            future_shoprite = executor.submit(scrape_shoprite, query)
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        future_pnp = executor.submit(scrape_pnp, query) if run_pnp else None
+        future_shoprite = executor.submit(scrape_shoprite, query) if run_shoprite else None
+        future_checkers = executor.submit(scrape_checkers, query) if run_checkers else None
+
+        if future_pnp:
             pnp_results = future_pnp.result()
+        if future_shoprite:
             shoprite_results = future_shoprite.result()
-    elif run_pnp:
-        pnp_results = scrape_pnp(query)
-    elif run_shoprite:
-        shoprite_results = scrape_shoprite(query)
+        if future_checkers:
+            checkers_results = future_checkers.result()
 
-    if run_pnp and run_shoprite and not sort_option:
+    if not sort_option:
         combined = []
-        max_len = max(len(pnp_results), len(shoprite_results))
+        max_len = max(len(pnp_results), len(shoprite_results), len(checkers_results))
         for i in range(max_len):
             if i < len(pnp_results):
                 combined.append(pnp_results[i])
             if i < len(shoprite_results):
                 combined.append(shoprite_results[i])
+            if i < len(checkers_results):
+                combined.append(checkers_results[i])
     else:
-        combined = pnp_results + shoprite_results
+        combined = pnp_results + shoprite_results + checkers_results
 
     if sort_option in ['asc', 'price_asc', 'low_to_high', 'low-to-high']:
         combined.sort(key=lambda x: x['price'])
@@ -260,7 +391,7 @@ def handle_search():
 
 
 # ==========================================
-# 4. CATEGORIES ENDPOINT
+# 5. CATEGORIES ENDPOINT
 # ==========================================
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
@@ -277,7 +408,8 @@ def get_categories():
         for query in items:
             pnp = scrape_pnp(query)[:2]
             shoprite = scrape_shoprite(query)[:2]
-            cat_products.extend(pnp + shoprite)
+            checkers = scrape_checkers(query)[:2]
+            cat_products.extend(pnp + shoprite + checkers)
         return cat_name, cat_products
 
     with ThreadPoolExecutor(max_workers=3) as executor:
@@ -293,7 +425,7 @@ def get_categories():
 
 
 # ==========================================
-# 5. EXACT-SIZE CROSS-STORE PRICE COMPARISON (Enhanced Matching)
+# 6. EXACT-SIZE CROSS-STORE PRICE COMPARISON (Enhanced Matching)
 # ==========================================
 @app.route('/api/compare', methods=['GET'])
 def compare_product():
@@ -308,11 +440,6 @@ def compare_product():
     # Helpers
     # --------------------------------------------------
     def normalise_size(text):
-        """
-        Return a canonical size string e.g. '2l', '500g', '100pk'.
-        Handles weight/volume AND pack counts like '100 Pack' or '26 Bags'.
-        """
-        # Weight / volume (more specific — try first)
         wv = re.search(
             r'\b(\d+(?:\.\d+)?)\s*(kg|g|ml|l|mg|litres?)\b',
             text, re.IGNORECASE
@@ -328,7 +455,6 @@ def compare_product():
             val_str = str(int(val)) if val == int(val) else str(val)
             return f"{val_str}{unit}"
 
-        # Pack / count: "100 Pack", "26 Bags", "12 Rolls", "x6", etc.
         pk = re.search(
             r'\b(\d+)\s*(?:pack|packs|bags?|rolls?|tablets?|tabs?|sachets?|'
             r'teabags?|capsules?|sheets?|wipes?|nappies|diapers?|bars?|slices?|'
@@ -343,10 +469,8 @@ def compare_product():
 
         return None
 
-    # Words that carry no product meaning
     STOP = {'with', 'and', 'the', 'for', 'of', 'in', 'a', 'by', 'per'}
 
-    # Adjectives that commonly differ between stores for the same product
     FILLER = re.compile(
         r'\b(full|low|fat|free|range|value|plain|natural|original|classic|'
         r'tagless|tagged|string|superior|quality|premium|extra|select|'
@@ -355,18 +479,15 @@ def compare_product():
     )
 
     def tokenise(text):
-        """Meaningful word tokens with adjectives stripped."""
         text = FILLER.sub('', text.lower())
         return {
             w for w in re.findall(r'[a-z]+', text)
             if len(w) > 2 and w not in STOP
         }
 
-    # Brand: first capitalised word in the name
     brand_match = re.match(r'([A-Z][a-zA-Z]+)', product_name.strip())
     brand = brand_match.group(1).lower() if brand_match else ''
 
-    # Core noun: first meaningful word that isn't the brand or a numeric/size token
     size_token_re = re.compile(r'^\d+(?:kg|g|ml|l|mg|pk)?$', re.I)
     noun_candidates = [
         w for w in re.findall(r'[a-zA-Z]+', product_name)
@@ -378,7 +499,6 @@ def compare_product():
 
     current_size = normalise_size(product_name)
 
-    # Build search query for the other store using the raw size string from the name
     raw_size_match = re.search(
         r'\b\d+(?:\.\d+)?\s*(?:kg|g|ml|l|mg|litres?|pack|packs|bags?|rolls?|pk)\b',
         product_name, re.IGNORECASE
@@ -388,12 +508,23 @@ def compare_product():
     search_query = ' '.join(query_parts) if query_parts else product_name[:40]
 
     # --------------------------------------------------
-    # Fetch alternatives from the other store
+    # Fetch alternatives from the other stores
     # --------------------------------------------------
+    alternatives = []
     if 'pick' in current_store or 'pnp' in current_store:
-        alternatives = scrape_shoprite(search_query)
+        alternatives.extend(scrape_shoprite(search_query))
+        alternatives.extend(scrape_checkers(search_query))
+    elif 'shoprite' in current_store:
+        alternatives.extend(scrape_pnp(search_query))
+        alternatives.extend(scrape_checkers(search_query))
+    elif 'checkers' in current_store:
+        alternatives.extend(scrape_pnp(search_query))
+        alternatives.extend(scrape_shoprite(search_query))
     else:
-        alternatives = scrape_pnp(search_query)
+        # Fallback if store name is ambiguous
+        alternatives.extend(scrape_pnp(search_query))
+        alternatives.extend(scrape_shoprite(search_query))
+        alternatives.extend(scrape_checkers(search_query))
 
     if not alternatives:
         return jsonify({'found': False})
@@ -407,9 +538,6 @@ def compare_product():
         alt_name = alt['name']
         alt_size = normalise_size(alt_name)
 
-        # Hard filter: sizes must match if either product has one.
-        # A 100-pack must not match a 26-pack, and a sized product
-        # must not match an unsized one.
         if current_size or alt_size:
             if current_size != alt_size:
                 return -1
@@ -417,25 +545,20 @@ def compare_product():
         score = 0
         alt_tokens = tokenise(alt_name)
 
-        # Brand match (+1)
         if brand and brand in alt_tokens:
             score += 1
 
-        # Core noun match (+1)
         if core_noun and core_noun in alt_tokens:
             score += 1
 
-        # Explicit size agreement (+1)
         if current_size and alt_size and current_size == alt_size:
             score += 1
 
-        # Token overlap tiebreaker (up to +0.5)
         overlap = len(current_tokens & alt_tokens)
         score += min(overlap, 1) * 0.5
 
         return score
 
-    # Must hit brand + noun + matching size to qualify
     SCORE_THRESHOLD = 3
 
     scored = [(alt, score_match(alt)) for alt in alternatives]
@@ -444,7 +567,6 @@ def compare_product():
     if not valid:
         return jsonify({'found': False})
 
-    # Pick the cheapest among valid matches
     cheapest_alt = min(valid, key=lambda x: x[0]['price'])[0]
 
     if cheapest_alt['price'] < current_price and current_price > 0:
