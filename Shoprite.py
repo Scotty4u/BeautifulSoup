@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(
 
 DATABASE_FOLDER = os.path.join(
     BASE_DIR,
-    "databases"
+    "Shoprite Databases"
 )
 
 RENDERED_HTML = os.path.join(
@@ -439,7 +439,7 @@ def create_category_database(category):
 
     database_path = os.path.join(
         DATABASE_FOLDER,
-        f"{category}.db"
+        f"Shoprite_{category}.db"
     )
 
     connection = sqlite3.connect(
