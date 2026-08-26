@@ -12,7 +12,7 @@ SmartBasket is a South African grocery price comparison web application. It allo
 ## Tech Stack
 - **Frontend:** HTML5, JavaScript (ES6+), Tailwind CSS (via CDN)
 - **Backend:** Python, Flask, Flask-CORS
-- **Data Scraping / Processing:** BeautifulSoup4, Requests
+- **Data Scraping / Processing:** BeautifulSoup4, Requests, Playwright
 
 ---
 
@@ -21,12 +21,19 @@ SmartBasket is a South African grocery price comparison web application. It allo
 ### Prerequisites
 Make sure you have **Python 3.8+** installed on your system.
 
-### 1. Clone the Repository & Setup Backend
-Open your terminal and navigate to the project directory, then install your dependencies using your requirements file:
+### 1. Clone the Repository & Set Up Your Environment
+Open your terminal and navigate to the directory where you want to store the project. Before installing dependencies, it is highly recommended to create a virtual environment to keep your packages isolated.
 
 ```bash
-pip install -r requirements.txt
+# Clone the repository and navigate into it
+git clone [https://github.com/yourusername/smartbasket.git](https://github.com/yourusername/smartbasket.git)
+cd smartbasket
 
+# Create a virtual environment
+python -m venv .venv
 
-```bash
-playwright install chromium
+# Activate the virtual environment (Windows)
+.\.venv\Scripts\activate
+
+# Activate the virtual environment (macOS/Linux)
+source .venv/bin/activate
