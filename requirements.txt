@@ -1,4 +1,7 @@
-﻿Flask==3.0.2
-requests==2.31.0
-beautifulsoup4==4.12.3
-flask-cors==4.0.0
+﻿APScheduler
+fake-useragent
+Flask
+Flask-Cors
+Flask-SQLAlchemy
+httpx
+playwright
