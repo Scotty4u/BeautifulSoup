@@ -63,8 +63,8 @@
                     </div>
                 </div>
 
-                <div class="hidden md:block flex-1 max-w-4xl mx-6 lg:mx-8">
-                    <form class="search-form-logic flex items-center rounded-full bg-gray-50 dark:bg-gray-800 px-4 py-2.5 border border-transparent focus-within:bg-white dark:focus-within:bg-gray-900 focus-within:border-gray-200 dark:focus-within:border-gray-700 transition-all duration-300">
+                <div class="hidden md:block flex-1 max-w-2xl mx-4 lg:mx-6">
+                    <form class="search-form-logic flex items-center rounded-full bg-gray-50 dark:bg-gray-800 px-5 py-2.5 border border-transparent focus-within:bg-white dark:focus-within:bg-gray-900 focus-within:border-gray-200 dark:focus-within:border-gray-700 transition-all duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                         <input type="text" class="search-input-logic w-full pl-3 bg-transparent focus:outline-none text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 font-medium" placeholder="Search products across stores..." required>
                     </form>
@@ -162,7 +162,7 @@
     <!-- MAIN CONTENT -->
     <main class="flex-grow flex flex-col">
 
-        <!-- LANDING HERO & EXPANDED BENTO IMPLEMENTATION -->
+        <!-- LANDING HERO & PRODUCTS GRID -->
         <div id="landing-container" class="w-full max-w-7xl mx-auto px-4 py-6 sm:py-10 space-y-12">
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -199,84 +199,14 @@
                 </div>
             </div>
 
-            <!-- Expanded Bento Grid Implementation -->
-            <div class="space-y-6 pt-4">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-xl sm:text-2xl font-black tracking-tight text-gray-900 dark:text-white">Explore Categories</h3>
-                    <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">Bento Collections</span>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div onclick="searchCategory('Milk')" class="lg:col-span-2 rounded-[32px] relative overflow-hidden group cursor-pointer shadow-sm border border-gray-100 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 flex flex-col justify-end p-8 h-[300px]">
-                        <img src="https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=800&q=80" alt="Dairy & Fresh Milk" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
-                        <div class="relative z-10 text-white">
-                            <span class="bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Dairy Hub</span>
-                            <h4 class="text-2xl sm:text-3xl font-black mt-3 tracking-tight">Dairy & Fresh Milk</h4>
-                            <p class="text-xs text-white/80 mt-1.5 font-medium">Fresh milk, cheese, butter, yogurt & cream</p>
-                        </div>
-                    </div>
-
-                    <div onclick="searchCategory('Juice')" class="rounded-[32px] relative overflow-hidden group cursor-pointer shadow-sm border border-gray-100 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 flex flex-col justify-end p-8 h-[300px]">
-                        <img src="https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=800&q=80" alt="Fresh Fruits & Juices" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
-                        <div class="relative z-10 text-white">
-                            <span class="bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Produce</span>
-                            <h4 class="text-xl sm:text-2xl font-black mt-3 tracking-tight">Fruits & Juices</h4>
-                            <p class="text-xs text-white/80 mt-1.5 font-medium">Seasonal fruits & natural juices</p>
-                        </div>
-                    </div>
-
-                    <div onclick="searchCategory('Pantry')" class="rounded-[32px] relative overflow-hidden group cursor-pointer shadow-sm border border-gray-100 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 flex flex-col justify-end p-8 h-[300px]">
-                        <img src="https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=800&q=80" alt="Pantry Staples" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
-                        <div class="relative z-10 text-white">
-                            <span class="bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Essentials</span>
-                            <h4 class="text-xl sm:text-2xl font-black mt-3 tracking-tight">Pantry Staples</h4>
-                            <p class="text-xs text-white/80 mt-1.5 font-medium">Rice, pasta, flour & oils</p>
-                        </div>
-                    </div>
-
-                    <div onclick="searchCategory('Bakery')" class="rounded-[32px] relative overflow-hidden group cursor-pointer shadow-sm border border-gray-100 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 flex flex-col justify-end p-8 h-[300px]">
-                        <img src="https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80" alt="Bakery & Bread" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
-                        <div class="relative z-10 text-white">
-                            <span class="bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Bakery</span>
-                            <h4 class="text-xl sm:text-2xl font-black mt-3 tracking-tight">Fresh Breads</h4>
-                            <p class="text-xs text-white/80 mt-1.5 font-medium">Brown, white & artisan loaves</p>
-                        </div>
-                    </div>
-
-                    <div onclick="searchCategory('Snacks')" class="rounded-[32px] relative overflow-hidden group cursor-pointer shadow-sm border border-gray-100 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 flex flex-col justify-end p-8 h-[300px]">
-                        <img src="https://images.unsplash.com/photo-1621939514649-280e2ee25f60?auto=format&fit=crop&w=800&q=80" alt="Snacks & Treats" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
-                        <div class="relative z-10 text-white">
-                            <span class="bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Treats</span>
-                            <h4 class="text-xl sm:text-2xl font-black mt-3 tracking-tight">Snacks & Chips</h4>
-                            <p class="text-xs text-white/80 mt-1.5 font-medium">Crisps, chocolates & sweets</p>
-                        </div>
-                    </div>
-
-                    <div onclick="searchCategory('Meat')" class="lg:col-span-2 rounded-[32px] relative overflow-hidden group cursor-pointer shadow-sm border border-gray-100 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 flex flex-col justify-end p-8 h-[300px]">
-                        <img src="https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&w=800&q=80" alt="Meat & Poultry" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
-                        <div class="relative z-10 text-white">
-                            <span class="bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Butchery</span>
-                            <h4 class="text-2xl sm:text-3xl font-black mt-3 tracking-tight">Meat & Poultry</h4>
-                            <p class="text-xs text-white/80 mt-1.5 font-medium">Steaks, chicken breasts, wors & mince</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bottom Unified Products Grid -->
+            <!-- Bottom Unified Products Grid (Capped at 25 items) -->
             <div class="space-y-6 pt-6">
                 <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4">
                     <h3 class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">Popular Grocery Items</h3>
                 </div>
                 
                 <div id="unified-bottom-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-2">
-                    <!-- Dynamically populated unified grid -->
+                    <!-- Dynamically populated unified grid limited to 25 items -->
                 </div>
             </div>
         </div>
@@ -767,7 +697,8 @@
                 }
 
                 if (allLoadedProducts.length > 0) {
-                    unifiedBottomGrid.innerHTML = allLoadedProducts.map((p, idx) => bentoCard(p, idx)).join('');
+                    const limitedProducts = allLoadedProducts.slice(0, 25);
+                    unifiedBottomGrid.innerHTML = limitedProducts.map((p, idx) => bentoCard(p, idx)).join('');
                 } else {
                     unifiedBottomGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 font-medium py-8">No products available at the moment.</p>`;
                 }
@@ -790,13 +721,11 @@
             localStorage.setItem('smartBasket_active', JSON.stringify(basket));
         }
 
-        // Exact match helper function to ensure users aren't shown smaller variants 
         const isExactProductMatch = (n1, n2) => {
             const sizeRegex = /(\d+(?:\.\d+)?)\s*(ml|l|g|kg)\b/i;
             const match1 = n1.match(sizeRegex);
             const match2 = n2.match(sizeRegex);
             
-            // If neither has a size listed, rely entirely on strict string matching
             if (!match1 && !match2) {
                  const clean1 = n1.toLowerCase().replace(/[^a-z0-9]/g, '');
                  const clean2 = n2.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -806,7 +735,6 @@
             const s1 = match1 ? match1[0].replace(/\s+/g, '').toLowerCase() : null;
             const s2 = match2 ? match2[0].replace(/\s+/g, '').toLowerCase() : null;
 
-            // If a size is found, it MUST match exactly across both strings
             if (s1 !== s2) return false; 
             
             const cleanName1 = n1.replace(sizeRegex, '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -854,7 +782,6 @@
 
                 if (cmpData.found && cmpData.products.length > 0) {
                     
-                    // Strictly filter cheaper alternatives so that smaller products don't trigger the "lower price" banner
                     const cheaperAlternatives = cmpData.products.filter(alt => {
                         return alt.price < p.price && alt.id !== p.id && isExactProductMatch(p.name, alt.name);
                     });
@@ -1374,7 +1301,7 @@
             productsGrid.innerHTML = '';
 
             try {
-                const res = await fetch(`${API}/api/search?q=${encodeURIComponent(lastQuery)}&store=${storeFilter.value}&sort=${sortOption.value}`);
+                const res = __HTTP_GET__(API + '/api/search?q=' + encodeURIComponent(lastQuery) + '&store=' + storeFilter.value + '&sort=' + sortOption.value);
                 let products = await res.json();
                 
                 const lowerQuery = lastQuery.toLowerCase();
