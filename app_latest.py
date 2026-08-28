@@ -344,12 +344,24 @@ def handle_search():
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
-    categories = {'Dairy & Essentials': ['Fresh Milk', 'Brown Bread', 'Large Eggs', 'Butter'], 'Pantry Staples': ['White Sugar', 'Sunflower Oil', 'White Maize Meal', 'Long Grain Rice']}
+    categories = {
+        'Dairy & Essentials': ['Milk', 'Bread', 'Eggs', 'Butter'], 
+        'Pantry Staples': ['Sugar', 'Oil', 'Maize Meal', 'Rice']
+    }
     response_data = {}
     for cat_name, items in categories.items():
         cat_products = []
         for q in items:
-            cat_products.extend((get_cached_data('pnp', q)[0] or [])[:2] + (get_cached_data('shoprite', q)[0] or [])[:2] + (get_cached_data('checkers', q)[0] or [])[:2])
+            db_products = Product.query.filter(Product.name.ilike(f'%{q}%')).limit(3).all()
+            for p in db_products:
+                cat_products.append({
+                    'id': p.id,
+                    'name': p.name,
+                    'store': p.store,
+                    'price': p.price,
+                    'formattedPrice': p.formatted_price,
+                    'imageUrl': p.image_url
+                })
         response_data[cat_name] = cat_products
     return jsonify(response_data)
 
