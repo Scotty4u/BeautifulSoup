@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow space-y-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
+        <div>
+            <a href="{{ url_for('saved_baskets') }}" class="inline-flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-brand-dark font-bold text-sm transition cursor-pointer mb-2">
+                <span>&larr; Back to Saved Baskets</span>
+            </a>
+            <h1 class="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">{{ basket.name }} 📦</h1>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Saved on {{ basket.created_at.strftime('%Y-%m-%d') }} &bull; {{ basket.items|length }} item(s) (Historical Snapshot)</p>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <button onclick="loadSavedBasketAsActive()" class="bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold px-5 py-2.5 rounded-xl shadow-sm transition cursor-pointer">
+                Load to Active Cart
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+        
+        <!-- LEFT COLUMN: ITEMS LIST WITH HISTORICAL VS LIVE PRICES -->
+        <div class="lg:col-span-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6 transition-colors">
+            <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4">
+                <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Saved Items</h2>
+                <span class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full">{{ basket.items|length }} Items</span>
+            </div>
+            
+            <div class="space-y-4 divide-y divide-gray-100 dark:divide-gray-800">
+                {% for item in basket.items %}
+                {% set live_price = item.product.price if item.product else 0.0 %}
+                {% set price_diff = live_price - item.price %}
+                <div class="flex items-center justify-between py-4 first:pt-2 last:pb-2 gap-3">
+                    <div class="flex items-center space-x-3 sm:space-x-4 min-w-0">
+                        <div class="h-14 w-14 sm:h-16 sm:w-16 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center justify-center p-2 shrink-0 overflow-hidden">
+                            <img src="{{ item.product.image_url if item.product else '' }}" class="object-contain h-full w-full" onerror="this.src='https://via.placeholder.com/60';">
+                        </div>
+                        <div class="min-w-0">
+                            <span class="inline-block text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-md mb-1">{{ item.product.store if item.product else 'Store' }}</span>
+                            <h4 class="text-xs sm:text-sm font-bold text-gray-900 dark:text-white break-words whitespace-normal">{{ item.product.name if item.product else 'Product' }}</h4>
+                            <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 space-y-0.5">
+                                <p>Qty: <span class="font-bold text-gray-700 dark:text-gray-300">{{ item.quantity }}</span></p>
+                                <p>Saved Price: <span class="font-bold text-gray-700 dark:text-gray-300">R {{ "%.2f"|format(item.price) }}</span></p>
+                                <p>Live Price: <span class="font-bold text-emerald-600 dark:text-emerald-400">R {{ "%.2f"|format(live_price) }}</span>
+                                    {% if price_diff > 0 %}
+                                        <span class="text-red-500 text-[10px] font-bold">(+R {{ "%.2f"|format(price_diff) }})</span>
+                                    {% elif price_diff < 0 %}
+                                        <span class="text-emerald-500 text-[10px] font-bold">(-R {{ "%.2f"|format(price_diff | abs) }})</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="text-xs text-gray-400 block">Saved Total</span>
+                        <span class="text-sm sm:text-base font-black text-gray-900 dark:text-emerald-400">R {{ "%.2f"|format(item.price * item.quantity) }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: TOTAL STORE COMPARISON BREAKDOWN -->
+        <div class="lg:col-span-7 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6 transition-colors">
+            <div class="border-b border-gray-100 dark:border-gray-800 pb-4">
+                <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Total Store Comparison</h2>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Calculated total cost using live retailer prices today.</p>
+            </div>
+            
+            <div id="detail-saved-breakdown" class="space-y-4"></div>
+        </div>
+    </div>
+</div>
+
+<!-- HIDDEN DATA BRIDGE FOR APP.JS -->
+<script id="basket-data" type="application/json">
+{
+    "name": {{ basket.name | tojson | safe }},
+    "items": [
+        {% for item in basket.items %}
+        {
+            "id": {{ (item.product.id if item.product else item.product_id) | tojson | safe }},
+            "name": {{ (item.product.name if item.product else 'Unknown Product') | tojson | safe }},
+            "store": {{ (item.product.store if item.product else 'Unknown') | tojson | safe }},
+            "price": {{ item.price }},
+            "quantity": {{ item.quantity }},
+            "imageUrl": {{ (item.product.image_url if item.product else '') | tojson | safe }},
+            "competitors": {% if item.competitor_prices %}{{ item.competitor_prices | safe }}{% else %}[]{% endif %}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ]
+}
+</script>
+{% endblock %}

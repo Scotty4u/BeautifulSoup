@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow">
+    
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 sm:mb-8 pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">Basket Comparison</h1>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Live price calculation across Pick n Pay, Shoprite, Checkers, and Woolworths.</p>
+        </div>
+        <div class="flex flex-row flex-wrap items-center gap-3">
+            <button onclick="openSaveBasketModal()" class="flex-1 sm:flex-none inline-flex items-center justify-center space-x-2 bg-brand-dark hover:bg-black dark:bg-emerald-600 text-white font-bold text-sm px-4 sm:px-5 py-2.5 rounded-xl transition cursor-pointer shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                <span>Save List</span>
+            </button>
+            <a href="{{ url_for('home') }}" class="flex-1 sm:flex-none inline-flex items-center justify-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-brand-dark font-bold text-sm transition cursor-pointer bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 px-4 sm:px-5 py-2.5 rounded-xl shadow-2xs hover:bg-gray-50 dark:hover:bg-gray-800">
+                <span>&larr; Shop More</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- DYNAMIC HERO SUMMARY -->
+    <div id="basket-hero-summary" class="mb-6 sm:mb-8 hidden"></div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+        
+        <!-- LEFT COLUMN: ITEMS LIST -->
+        <div class="lg:col-span-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6 transition-colors">
+            <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4">
+                <div class="flex items-center space-x-3">
+                    <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Items List</h2>
+                    <span class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full"><span id="basket-page-count">0</span> Items</span>
+                </div>
+                <button onclick="clearEntireBasket()" class="p-2 bg-gray-50 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-950/50 text-gray-400 hover:text-red-600 rounded-xl transition cursor-pointer" title="Delete Whole List">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- JS injects basket items here -->
+            <div id="basket-page-items-list" class="space-y-4 divide-y divide-gray-100 dark:divide-gray-800"></div>
+        </div>
+
+        <!-- RIGHT COLUMN: PRICE BREAKDOWN -->
+        <div class="lg:col-span-7 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6 transition-colors">
+            <div class="border-b border-gray-100 dark:border-gray-800 pb-4">
+                <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Total Store Comparison</h2>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Calculated total cost if you buy your full list at a single retailer.</p>
+            </div>
+            
+            <!-- JS injects the store comparison panels here -->
+            <div id="basket-page-breakdown-container" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- SAVE BASKET MODAL (Hidden by default) -->
+    <div id="save-basket-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-xl space-y-5 sm:space-y-6 transition-colors">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Save Your Basket</h3>
+                <button onclick="closeSaveBasketModal()" class="text-gray-400 hover:text-gray-900 dark:hover:text-white text-xl font-bold cursor-pointer p-1 transition">✕</button>
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Basket Name</label>
+                <input type="text" id="saved-basket-name-input" placeholder="e.g. Monthly Groceries..." class="w-full border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-dark bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 transition">
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="closeSaveBasketModal()" class="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold py-3 rounded-xl transition cursor-pointer text-sm">Cancel</button>
+                <button onclick="confirmSaveBasket()" class="flex-1 bg-brand-dark hover:bg-black dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition cursor-pointer text-sm shadow-sm">Save List</button>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
