@@ -1,7 +1,10 @@
-﻿APScheduler
-fake-useragent
-Flask
-Flask-Cors
-Flask-SQLAlchemy
-httpx
-playwright
+﻿Flask==3.0.2
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.25
+beautifulsoup4==4.12.3
+playwright==1.41.2
+httpx==0.26.0
+requests==2.31.0
+fake-useragent==1.4.0
+APScheduler==3.10.4
+Werkzeug==3.0.1
