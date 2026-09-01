@@ -1,0 +1,7 @@
+﻿APScheduler
+fake-useragent
+Flask
+Flask-Cors
+Flask-SQLAlchemy
+httpx
+playwright
