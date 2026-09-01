@@ -14,7 +14,6 @@
                 }
             }
         }
-        // Initialize theme instantly to prevent flash
         if (localStorage.getItem('smartBasket_theme') === 'dark') {
             document.documentElement.classList.add('dark');
         }
@@ -22,7 +21,7 @@
 </head>
 <body class="bg-gray-50 dark:bg-[#0a0a0a] min-h-screen flex items-center justify-center p-4 transition-colors duration-300 antialiased font-sans">
 
-    <!-- Theme Toggle (Optional/Hidden for cleaner auth page, or kept top right) -->
+    <!-- Theme Toggle -->
     <button onclick="toggleDarkMode()" class="absolute top-6 right-6 p-3 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-800 dark:text-emerald-400 hover:scale-110 transition shadow-sm cursor-pointer">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
@@ -32,61 +31,57 @@
     <!-- Sign Up Card -->
     <div class="max-w-md w-full bg-white dark:bg-gray-900 rounded-[32px] p-8 sm:p-10 shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden">
         
-        <!-- Background decorative gradient -->
         <div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none"></div>
 
-        <!-- Logo -->
         <div class="flex justify-center mb-4 relative z-10">
             <div class="h-16 w-16 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border-2 border-emerald-100 dark:border-emerald-800/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm">
-                <!-- Shopping Bag Icon mimicking the reference image -->
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
             </div>
         </div>
 
-        <!-- Header -->
-        <div class="text-center mb-8 relative z-10">
+        <div class="text-center mb-6 relative z-10">
             <h1 class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">Smart Basket</h1>
             <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200 mt-2">Sign up</h2>
             <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium mt-1">Create an account to start saving on groceries</p>
         </div>
 
-        <!-- Form -->
-        <form class="space-y-4 relative z-10" action="#" method="POST">
+        {% if error %}
+        <div class="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-bold p-3 rounded-xl mb-4 text-center relative z-10">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Form with action and input names added -->
+        <form class="space-y-4 relative z-10" action="{{ url_for('signup') }}" method="POST">
             
-            <!-- Full Name Input -->
             <div>
                 <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Full Name</label>
-                <input type="text" placeholder="John Doe" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 sm:py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium" required>
+                <input type="text" name="username" placeholder="John Doe" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 sm:py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium" required>
             </div>
 
-            <!-- Email Input -->
             <div>
                 <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Email Address</label>
-                <input type="email" placeholder="you@example.com" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 sm:py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium" required>
+                <input type="email" name="email" placeholder="you@example.com" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 sm:py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium" required>
             </div>
 
-            <!-- Password Input -->
             <div>
                 <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Password</label>
-                <input type="password" placeholder="••••••••" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 sm:py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium" required>
+                <input type="password" name="password" placeholder="••••••••" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 sm:py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium" required>
             </div>
 
-            <!-- Sign Up Button -->
-            <button type="submit" class="w-full bg-brand-dark dark:bg-emerald-600 hover:bg-gray-800 dark:hover:bg-emerald-500 text-white font-bold rounded-2xl px-4 py-3.5 mt-2 transition-all duration-300 shadow-sm cursor-pointer text-sm sm:text-base">
+            <button type="submit" class="w-full bg-black dark:bg-emerald-600 hover:bg-gray-800 dark:hover:bg-emerald-500 text-white font-bold rounded-2xl px-4 py-3.5 mt-2 transition-all duration-300 shadow-sm cursor-pointer text-sm sm:text-base">
                 Create Account
             </button>
         </form>
 
-        <!-- Divider -->
         <div class="flex items-center justify-center space-x-3 my-6 relative z-10">
             <div class="h-px bg-gray-200 dark:bg-gray-800 flex-1"></div>
             <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">OR</span>
             <div class="h-px bg-gray-200 dark:bg-gray-800 flex-1"></div>
         </div>
 
-        <!-- Google Sign Up Button -->
         <button type="button" class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-bold rounded-2xl px-4 py-3 sm:py-3.5 transition-all duration-300 shadow-2xs cursor-pointer flex items-center justify-center space-x-3 text-sm">
             <svg class="h-5 w-5" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -97,10 +92,9 @@
             <span>Sign up with Google</span>
         </button>
 
-        <!-- Footer Link -->
         <p class="text-center text-xs font-medium text-gray-500 dark:text-gray-400 mt-8 relative z-10">
             Already have an account? 
-            <a href="/login" class="text-emerald-600 dark:text-emerald-400 font-bold hover:underline">Sign in</a>
+            <a href="{{ url_for('login') }}" class="text-emerald-600 dark:text-emerald-400 font-bold hover:underline">Sign in</a>
         </p>
 
     </div>

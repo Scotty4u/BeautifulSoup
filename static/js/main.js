@@ -7,6 +7,7 @@ let basket = [];
 let allSavedBaskets = [];
 let currentInspectedSavedBasket = null;
 let currentActiveProduct = null;
+let isCartInitialized = false;
 
 const categoryKeywords = {
     'Milk': ['milk', 'dairy', 'butter', 'cheese', 'yogurt', 'cream', 'lank', '2l', '1l'],
@@ -23,7 +24,7 @@ const categoryKeywords = {
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     loadActiveBasketFromStorage();
-    updateGlobalBasketCounter();
+    initLogoutInterceptor();
 
     if (document.getElementById('unified-bottom-grid')) {
         initLandingPage();
@@ -36,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (document.getElementById('saved-baskets-list-container')) {
         renderSavedBasketsList();
     } else if (document.getElementById('detail-saved-breakdown')) {
-        initSavedBasketDetailPage(); // Matches the ID in saved_basket_detail.html
+        initSavedBasketDetailPage();
     }
 });
 
@@ -207,20 +208,34 @@ function bentoCard(p, idx = -1) {
 }
 
 // ==========================================
-// 4. BASKET LOGIC (Local Storage)
+// 4. BASKET LOGIC & BACKEND SYNC
 // ==========================================
-function loadActiveBasketFromStorage() {
-    const stored = localStorage.getItem('smartBasket_active');
-    if (stored) {
-        try {
-            basket = JSON.parse(stored);
+async function loadActiveBasketFromStorage() {
+    try {
+        const res = await fetch(`${API}/api/db/active-cart`);
+        if (res.ok) {
+            const data = await res.json();
+            basket = data.items || [];
             basket.forEach(registerProduct);
-        } catch (e) { basket = []; }
+        }
+    } catch (e) {
+        basket = [];
+    }
+    isCartInitialized = true;
+    updateGlobalBasketCounter();
+    
+    if (document.getElementById('basket-page-items-list')) {
+        updateBasketPageUI();
     }
 }
 
 function saveActiveBasketToStorage() {
-    localStorage.setItem('smartBasket_active', JSON.stringify(basket));
+    if (!isCartInitialized) return; // Prevent overwriting during initial load race conditions
+    fetch(`${API}/api/db/active-cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: basket })
+    }).catch(err => console.error('Failed to sync active cart', err));
 }
 
 function updateGlobalBasketCounter() {
@@ -236,9 +251,15 @@ function updateGlobalBasketCounter() {
 }
 
 function quickAddToBasket(e, productId) {
-    if (e) e.stopPropagation();
-    const p = globalProductRegistry[productId];
-    if (!p) return;
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+    const p = globalProductRegistry[productId] || currentActiveProduct;
+    if (!p) {
+        showToast('Product information not found.');
+        return;
+    }
     
     const existing = basket.find(item => item.id === p.id);
     if (existing) {
@@ -249,6 +270,15 @@ function quickAddToBasket(e, productId) {
     
     updateGlobalBasketCounter();
     showToast(`Added ${p.name.substring(0, 20)}... to basket!`);
+}
+
+function addToBasketDetail() {
+    if (!currentActiveProduct) {
+        showToast('Product information not found.');
+        return;
+    }
+    registerProduct(currentActiveProduct);
+    quickAddToBasket(null, currentActiveProduct.id);
 }
 
 function updateQuantity(index, change) {
@@ -272,25 +302,55 @@ function clearEntireBasket() {
     showToast("Basket cleared.");
 }
 
+function initLogoutInterceptor() {
+    document.addEventListener('click', async (e) => {
+        const logoutLink = e.target.closest('a[href="/logout"]');
+        if (logoutLink) {
+            e.preventDefault();
+            // Behind-the-scenes auto-save to user's saved lists if cart has items
+            if (basket && basket.length > 0) {
+                try {
+                    await fetch(`${API}/api/db/save-basket`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: `Auto-saved Cart (${new Date().toLocaleDateString()})`,
+                            items: basket
+                        })
+                    });
+                } catch (err) {
+                    console.error('Failed to auto-save cart on logout', err);
+                }
+            }
+            // Clear active cart on backend session
+            try {
+                await fetch(`${API}/api/db/active-cart`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: [] })
+                });
+            } catch (err) {}
+            
+            window.location.href = '/logout';
+        }
+    });
+}
+
 // ==========================================
 // 5. PAGE INITIALIZERS & RENDERERS
 // ==========================================
 
 async function initLandingPage() {
     const unifiedBottomGrid = document.getElementById('unified-bottom-grid');
+    if (!unifiedBottomGrid) return;
+
     try {
-        const res = await fetch(`${API}/api/categories`);
-        const categoriesData = await res.json();
-        allLoadedProducts = [];
+        const res = await fetch('/api/popular');
+        const products = await res.json();
 
-        for (const [catName, products] of Object.entries(categoriesData)) {
-            if (products && products.length) {
-                allLoadedProducts.push(...products);
-            }
-        }
-
-        if (allLoadedProducts.length > 0) {
-            unifiedBottomGrid.innerHTML = allLoadedProducts.slice(0, 25).map((p, idx) => bentoCard(p, idx)).join('');
+        if (products && products.length > 0) {
+            products.forEach(registerProduct);
+            unifiedBottomGrid.innerHTML = products.slice(0, 40).map((p, idx) => bentoCard(p, idx)).join('');
         } else {
             unifiedBottomGrid.innerHTML = `<p class="col-span-full text-center text-gray-400 font-medium py-8">No products available at the moment.</p>`;
         }
@@ -460,7 +520,6 @@ function updateBasketPageUI() {
     renderComparisonBreakdownAsync(basket, 'basket-page-breakdown-container', 'basket-hero-summary', true);
 }
 
-
 // ==========================================
 // 5B. REAL-TIME STORE COMPARISON LOGIC
 // ==========================================
@@ -515,9 +574,6 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
             } else {
                 const equivalents = (item.competitors || []).filter(c => c.store === storeObj.name);
                 if (equivalents.length > 0) {
-                    
-                    // TRUST THE BACKEND: The backend has already determined if this is an exact match or an equivalent,
-                    // and it has already sorted the best option to the top. We just take index 0.
                     let bestEq = equivalents[0];
                     let exactMatchFound = bestEq.isExact === true || bestEq.is_exact_match === true;
 
@@ -604,7 +660,6 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
         `;
     }).join('');
 }
-
 
 // ==========================================
 // 6. SAVED BASKETS (Database & Historical Snapshot)
@@ -701,11 +756,10 @@ function renderSavedBasketComparison(items, containerId) {
 
     items.forEach(item => {
         const qty = item.quantity || 1;
-        const basePrice = item.price; // The historical snapshot price
+        const basePrice = item.price;
 
         storeData.forEach(storeObj => {
             if (item.store === storeObj.name) {
-                // Original store item at snapshot price
                 storeObj.items.push({
                     name: item.name,
                     store: item.store,
@@ -719,7 +773,6 @@ function renderSavedBasketComparison(items, containerId) {
                 });
                 storeObj.total += (basePrice * qty);
             } else {
-                // Look inside the saved competitors snapshot array
                 const comps = item.competitors || [];
                 const match = comps.find(c => c.store === storeObj.name);
 
@@ -739,7 +792,6 @@ function renderSavedBasketComparison(items, containerId) {
                     });
                     storeObj.total += (compPrice * qty);
                 } else {
-                    // Item was not captured in snapshot for this store
                     storeObj.items.push({
                         name: item.name,
                         store: storeObj.name,
@@ -826,11 +878,8 @@ async function initSavedBasketDetailPage() {
             return;
         }
 
-        // Render instantly using the saved historical snapshot data (zero network requests)
         renderSavedBasketComparison(basketData.items, 'detail-saved-breakdown');
-        
     } catch (e) {
-        console.error("Failed to parse basket JSON data bridge:", e);
         breakdownContainer.innerHTML = `<p class="text-xs text-red-500 p-4 text-center">JSON Parse Error: ${e.message}</p>`;
     }
 }

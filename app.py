@@ -12,9 +12,10 @@ from typing import Dict, List, Tuple
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fake_useragent import UserAgent
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, session, redirect, url_for
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 import httpx
 from playwright.async_api import async_playwright
 
@@ -24,19 +25,12 @@ CORS(app)
 # ==========================================
 # DATABASE & CONFIGURATION
 # ==========================================
-db_path = os.path.join(tempfile.gettempdir(), 'smartbasket.db')
-if os.path.exists(db_path):
-    try:
-        os.remove(db_path)
-    except Exception:
-        pass
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
+db_path = 'smartbasket.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
-with app.app_context():
-    db.create_all()
 
 CACHE_DB_FILE = os.path.join(tempfile.gettempdir(), "smartbasket_cache.db")
 CACHE_EXPIRATION_SECONDS = 43200  # 12 Hours
@@ -51,7 +45,6 @@ WAF_TOKEN_CACHE: Dict[str, dict] = {
 PROXY_URL = os.getenv("RESIDENTIAL_PROXY_URL", None)
 ua_generator = UserAgent()
 
-# Loop-safe dynamic management to prevent event loop binding errors
 _semaphores = {}
 def get_http_semaphore():
     loop = asyncio.get_running_loop()
@@ -59,17 +52,17 @@ def get_http_semaphore():
         _semaphores[loop] = asyncio.Semaphore(5)
     return _semaphores[loop]
 
-_http_client = None
+_http_clients = {}
 def get_http_client():
-    global _http_client
-    if _http_client is None or _http_client.is_closed:
-        _http_client = httpx.AsyncClient(
+    loop = asyncio.get_running_loop()
+    if loop not in _http_clients or _http_clients[loop].is_closed:
+        _http_clients[loop] = httpx.AsyncClient(
             proxy=PROXY_URL if PROXY_URL else None,
             limits=httpx.Limits(max_keepalive_connections=20, max_connections=30),
             timeout=10.0,
             follow_redirects=True,
         )
-    return _http_client
+    return _http_clients[loop]
 
 # ==========================================
 # SQLALCHEMY DATABASE MODELS
@@ -79,6 +72,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     baskets = db.relationship('SavedBasket', backref='owner', lazy=True, cascade="all, delete-orphan")
 
@@ -91,6 +85,19 @@ class Product(db.Model):
     formatted_price = db.Column(db.String(20))
     image_url = db.Column(db.Text)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+
+class UserPreference(db.Model):
+    __tablename__ = 'user_preferences'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    preferred_store = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class ActiveCart(db.Model):
+    __tablename__ = 'active_carts'
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
+    items_json = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class SavedBasket(db.Model):
     __tablename__ = 'saved_baskets'
@@ -155,7 +162,7 @@ def log_search_results_to_db(products_list):
     try:
         with app.app_context():
             for item in products_list:
-                existing = Product.query.get(item['id'])
+                existing = db.session.get(Product, item['id'])
                 if not existing:
                     new_p = Product(
                         id=item['id'],
@@ -227,7 +234,7 @@ def refresh_tokens_sync():
     print("[Scheduler] Token harvest complete.")
 
 # ==========================================
-# 7-STEP MATCHING & UTILITIES
+# MATCHING & UTILITIES
 # ==========================================
 def optimize_search_query(query: str) -> str:
     cleaned = re.sub(r'\b(pnp|woolworths|shoprite|checkers|finest|store|superior|sliced|thick slice|fresh)\b', '', query, flags=re.IGNORECASE)
@@ -241,13 +248,7 @@ def extract_size(product_name: str):
     return None
 
 def filter_and_score_competitors(original_name: str, scraped_results: list) -> list:
-    """
-    Uses token intersection and semantic keyword matching to find store equivalents
-    regardless of retail naming differences, enforcing size matching.
-    """
     target_size = extract_size(original_name)
-    
-    # Common descriptive filler words to ignore during semantic comparison
     stop_words = {'the', 'and', 'fresh', 'superior', 'sliced', 'thick', 'slice', 'grade', 'full', 'cream', 'long', 'life', 'white', 'brown', 'regular', 'classic'}
     
     def get_clean_tokens(name):
@@ -277,7 +278,6 @@ def filter_and_score_competitors(original_name: str, scraped_results: list) -> l
             item_name = item.get('name', '')
             item_size = extract_size(item_name)
             
-            # Size Rule: If both specify sizes, they must match
             if target_size and item_size and target_size != item_size:
                 continue
                 
@@ -285,20 +285,17 @@ def filter_and_score_competitors(original_name: str, scraped_results: list) -> l
             if not target_tokens or not item_tokens:
                 continue
                 
-            # Calculate token intersection (shared core words like brand + product type)
             intersection = target_tokens.intersection(item_tokens)
             union = target_tokens.union(item_tokens)
             jaccard_score = len(intersection) / len(union) if union else 0
             seq_similarity = difflib.SequenceMatcher(None, original_name.lower(), item_name.lower()).ratio()
             
-            # Require shared core identity tokens to qualify as a valid match
             if len(intersection) >= min(2, len(target_tokens)) or jaccard_score >= 0.35:
                 score = jaccard_score + (seq_similarity * 0.5)
                 
                 if score > highest_score:
                     highest_score = score
                     best_match = item
-                    # Strict string match determines if it's an exact match vs store equivalent badge
                     is_exact = bool(seq_similarity >= 0.70 or target_tokens == item_tokens)
 
         if best_match:
@@ -306,7 +303,6 @@ def filter_and_score_competitors(original_name: str, scraped_results: list) -> l
             best_match['isExact'] = is_exact
             final_results.append(best_match)
         elif items:
-            # Fallback to the lowest-priced item of the identical size in that store
             same_size = [i for i in items if not target_size or extract_size(i.get('name', '')) == target_size]
             pool = same_size if same_size else items
             pool.sort(key=lambda x: x['price'])
@@ -678,10 +674,43 @@ async def internal_fetch_competitors(query: str):
     all_results = pnp_res + sr_res + ch_res + ww_res
     return filter_and_score_competitors(query, all_results)
 
-# --- SQL DB Saved Basket Endpoints ---
+# --- Active Cart & Saved Basket Endpoints ---
+# --- Active Cart & Saved Basket Endpoints ---
+@app.route('/api/db/active-cart', methods=['GET', 'POST'])
+def handle_active_cart():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'items': []})
+    
+    if request.method == 'GET':
+        cart_record = db.session.get(ActiveCart, user_id)
+        if cart_record and cart_record.items_json:
+            try:
+                return jsonify({'items': json.loads(cart_record.items_json)})
+            except:
+                pass
+        return jsonify({'items': []})
+    
+    elif request.method == 'POST':
+        data = request.json or {}
+        items = data.get('items', [])
+        cart_record = db.session.get(ActiveCart, user_id)
+        if not cart_record:
+            cart_record = ActiveCart(user_id=user_id, items_json=json.dumps(items))
+            db.session.add(cart_record)
+        else:
+            cart_record.items_json = json.dumps(items)
+        db.session.commit()
+        return jsonify({'success': True})
+
 @app.route('/api/db/saved-baskets', methods=['GET'])
 def get_db_saved_baskets():
-    baskets = SavedBasket.query.order_by(SavedBasket.created_at.desc()).all()
+    user_id = session.get('user_id')
+    if user_id:
+        baskets = SavedBasket.query.filter_by(user_id=user_id).order_by(SavedBasket.created_at.desc()).all()
+    else:
+        baskets = SavedBasket.query.filter_by(user_id=None).order_by(SavedBasket.created_at.desc()).all()
+        
     output = []
     for b in baskets:
         items_list = [{
@@ -701,7 +730,7 @@ def save_basket_to_db():
     if not items: return jsonify({'error': 'No items in basket'}), 400
 
     try:
-        new_basket = SavedBasket(name=basket_name)
+        new_basket = SavedBasket(name=basket_name, user_id=session.get('user_id'))
         db.session.add(new_basket)
         db.session.flush()
 
@@ -712,7 +741,7 @@ def save_basket_to_db():
         competitors_lists = asyncio.run(get_all_competitors())
 
         for idx, item in enumerate(items):
-            product = Product.query.get(item['id'])
+            product = db.session.get(Product, item['id'])
             if not product:
                 product = Product(
                     id=item['id'], name=item['name'], store=item['store'],
@@ -721,7 +750,6 @@ def save_basket_to_db():
                 )
                 db.session.add(product)
                 
-            # Grab all valid competitors for the snapshot (don't limit to 3 anymore)
             comps = [c for c in competitors_lists[idx] if c['id'] != item['id']]
 
             snapshot_price = float(item['price'])
@@ -730,7 +758,7 @@ def save_basket_to_db():
                 product_id=item['id'], 
                 quantity=item.get('quantity', 1),
                 price=snapshot_price,
-                competitor_prices=json.dumps(comps) # Save ALL competitors to DB
+                competitor_prices=json.dumps(comps)
             ))
 
         db.session.commit()
@@ -742,7 +770,7 @@ def save_basket_to_db():
 @app.route('/api/db/saved-baskets/<int:basket_id>', methods=['DELETE'])
 def delete_db_basket(basket_id):
     try:
-        b = SavedBasket.query.get(basket_id)
+        b = db.session.get(SavedBasket, basket_id)
         if not b: return jsonify({'error': 'Basket not found'}), 404
         db.session.delete(b)
         db.session.commit()
@@ -756,7 +784,37 @@ def delete_db_basket(basket_id):
 # ==========================================
 @app.route('/')
 def home():
-    return render_template('index.html')
+    user_pref_stores = []
+    if 'user_id' in session:
+        user_pref = UserPreference.query.filter_by(user_id=session['user_id']).first()
+        if user_pref and user_pref.preferred_store:
+            user_pref_stores = [s.strip() for s in user_pref.preferred_store.split(',')]
+            
+    return render_template('index.html', user_pref_stores=user_pref_stores)
+
+@app.route('/api/popular', methods=['GET'])
+def api_popular_products():
+    user_pref_stores = []
+    if 'user_id' in session:
+        user_pref = UserPreference.query.filter_by(user_id=session['user_id']).first()
+        if user_pref and user_pref.preferred_store:
+            user_pref_stores = [s.strip() for s in user_pref.preferred_store.split(',')]
+            
+    if user_pref_stores:
+        products = Product.query.filter(Product.store.in_(user_pref_stores)).order_by(db.func.random()).limit(20).all()
+    else:
+        products = Product.query.order_by(db.func.random()).limit(20).all()
+        
+    output = [{
+        'id': p.id,
+        'name': p.name,
+        'store': p.store,
+        'price': p.price,
+        'formattedPrice': p.formatted_price,
+        'imageUrl': p.image_url
+    } for p in products]
+    
+    return jsonify(output)
 
 @app.route('/search')
 def search():
@@ -782,21 +840,100 @@ def saved_basket_detail(basket_id):
 
 @app.route('/account')
 def account():
-    return render_template('account.html')
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    user = db.session.get(User, session['user_id'])
+    user_pref = UserPreference.query.filter_by(user_id=user.id).first()
+    return render_template('account.html', user=user, user_pref=user_pref)
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    # If you submit the form, handle the POST request here in the future
     if request.method == 'POST':
-        pass 
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        if User.query.filter_by(email=email).first():
+            return render_template('signup.html', error="Email already exists.")
+            
+        new_user = User(
+            username=username, 
+            email=email, 
+            password_hash=generate_password_hash(password)
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        
+        session['user_id'] = new_user.id
+        session['username'] = new_user.username
+        
+        next_url = url_for('onboarding')
+        return f"""
+        <script>
+            localStorage.removeItem('smartBasket_active');
+            window.location.href = '{next_url}';
+        </script>
+        """
+        
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # If you submit the form, handle the POST request here in the future
     if request.method == 'POST':
-        pass 
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        user = User.query.filter_by(email=email).first()
+        
+        id_valid = user and check_password_hash(user.password_hash, password)
+        if id_valid:
+            session['user_id'] = user.id
+            session['username'] = user.username
+            
+            pref = UserPreference.query.filter_by(user_id=user.id).first()
+            next_url = url_for('onboarding') if not pref else url_for('account')
+            return f"""
+            <script>
+                localStorage.removeItem('smartBasket_active');
+                window.location.href = '{next_url}';
+            </script>
+            """
+        else:
+            return render_template('login.html', error="Invalid email or password.")
+            
     return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return """
+    <script>
+        localStorage.removeItem('smartBasket_active');
+        window.location.href = '/login';
+    </script>
+    """
+
+@app.route('/onboarding', methods=['GET', 'POST'])
+def onboarding():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    user_pref = UserPreference.query.filter_by(user_id=session['user_id']).first()
+    
+    if request.method == 'POST':
+        stores = request.form.getlist('preferred_stores')
+        stores_str = ",".join(stores) if stores else "Checkers"
+        
+        if not user_pref:
+            user_pref = UserPreference(user_id=session['user_id'], preferred_store=stores_str)
+            db.session.add(user_pref)
+        else:
+            user_pref.preferred_store = stores_str
+        db.session.commit()
+        return redirect(url_for('account'))
+        
+    return render_template('onboarding.html')
 
 # ==========================================
 # APP STARTUP
