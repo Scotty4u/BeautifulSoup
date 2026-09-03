@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="w-full max-w-7xl mx-auto px-4 py-8">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-200 dark:border-gray-800 mb-8 gap-4 shadow-sm">
+        
+        <div class="flex items-center space-x-3">
+            <h1 class="text-xl font-bold">Results for: "{{ query }}"</h1>
+        </div>
+
+        <div class="flex space-x-4">
+            <select id="store-filter" class="border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-sm font-medium bg-gray-50 dark:bg-gray-800">
+                <option value="all">All Stores</option>
+                <option value="pnp">Pick n Pay</option>
+                <option value="shoprite">Shoprite</option>
+                <option value="checkers">Checkers</option>
+                <option value="woolworths">Woolworths</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Container where JS will inject fetched API data based on the URL query -->
+    <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Grab the query from Flask and trigger the JS fetch automatically on load
+    const currentQuery = "{{ query }}";
+    document.addEventListener('DOMContentLoaded', () => {
+        if (currentQuery) {
+            fetchProducts(currentQuery);
+        }
+    });
+</script>
+{% endblock %}
