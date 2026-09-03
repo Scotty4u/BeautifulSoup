@@ -9,7 +9,6 @@ classDiagram
         +String password_hash
         +DateTime created_at
         +List~SavedBasket~ baskets
-        +List~Order~ orders
         +List~Review~ reviews
     }
 
@@ -60,17 +59,6 @@ classDiagram
         +DateTime created_at
     }
 
-    class Address {
-        +Integer id (PK)
-        +Integer user_id (FK)
-        +String street_address
-        +String city
-        +String postal_code
-        +String country
-        +String phone_number
-        +Boolean is_default
-    }
-
     class ActiveCart {
         +Integer user_id (PK, FK)
         +String items_json
@@ -95,27 +83,6 @@ classDiagram
         +Product product
     }
 
-    class Order {
-        +Integer id (PK)
-        +Integer user_id (FK)
-        +Integer address_id (FK)
-        +Float total_price
-        +String status
-        +DateTime order_date
-        +DateTime delivery_date
-        +List~OrderItem~ items
-        +List~Notification~ notifications
-    }
-
-    class OrderItem {
-        +Integer id (PK)
-        +Integer order_id (FK)
-        +String product_id (FK)
-        +Integer quantity
-        +Float price_at_purchase
-        +Product product
-    }
-
     class Review {
         +Integer id (PK)
         +Integer user_id (FK)
@@ -126,43 +93,26 @@ classDiagram
         +Integer helpful_count
     }
 
-    class Notification {
-        +Integer id (PK)
-        +Integer user_id (FK)
-        +Integer order_id (FK)
-        +String type
-        +String message
-        +DateTime created_at
-        +Boolean is_read
-    }
-
     %% Relationships
     User "1" --> "*" SavedBasket : owns
     User "1" --> "0..1" UserPreference : has
     User "1" --> "0..1" ActiveCart : has
-    User "1" --> "*" Address : has
-    User "1" --> "*" Order : places
     User "1" --> "*" Review : writes
-    User "1" --> "*" Notification : receives
     
-    Store "1" --> "*" Product : sells
+    Store "1" --> "*" Product : makes_available
     Category "1" --> "*" Product : categorizes
     Product "1" --> "*" BasketItem : in
     Product "1" --> "*" PriceHistory : has
     Product "1" --> "*" Review : reviewed_in
-    Product "1" --> "*" OrderItem : in
     
     SavedBasket "1" --> "*" BasketItem : contains
-    Order "1" --> "*" OrderItem : contains
-    Order "1" --> "1" Address : ships_to
-    Order "1" --> "*" Notification : generates
 ```
 
 ## Core Tables (Original 6)
 
 ### User
 - Manages user accounts with authentication
-- Has many saved baskets, orders, and reviews
+- Has many saved baskets and reviews
 
 ### Product
 - Represents products from different stores
@@ -185,12 +135,12 @@ classDiagram
 - Individual item in a saved basket
 - Links products to baskets
 
-## New Tables (8 Additional)
+## Additional Tables
 
 ### Store
 - Manages different supermarket chains (Pick n Pay, Shoprite, Checkers, Woolworths)
 - One-to-many relationship with Product
-- Tracks store metadata like logos and websites
+- Tracks store metadata like logos and websites so shoppers know where to find products
 
 ### Category
 - Organizes products by type (Groceries, Electronics, Clothing, etc.)
@@ -209,24 +159,8 @@ classDiagram
 - Tracks helpful votes on reviews
 - Links User, Product together
 
-### Order
-- Represents completed purchases
-- Tracks order status and delivery dates
-- Links to delivery address and generates notifications
-- One-to-many relationship with OrderItem and Notification
-
-### OrderItem
-- Individual items within a completed order
-- Stores price at time of purchase (for historical tracking)
-- Similar to BasketItem but for finalized orders
-
-### Notification
-- Sends alerts to users (price drops, order status, etc.)
-- Links User and Order
-- Tracks read status for user engagement
-
-### Address
-- Stores multiple delivery addresses per user
-- Supports default address selection
-- One-to-many relationship with User
-- Referenced by Order for shipping
+### In-store shopping
+- SmartBasket does not process purchases, orders, or deliveries.
+- Products and prices show shoppers which retailer has an item available.
+- Users visit the listed store to purchase the items themselves.
+- Baskets are shopping lists used for store and price comparison.
