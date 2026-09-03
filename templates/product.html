@@ -28,7 +28,7 @@
                     <p class="text-xs font-semibold text-gray-400 break-all">Product Identifier: <span id="detail-id" class="font-mono"></span></p>
                 </div>
 
-                <!-- COLLAPSIBLE LOWER PRICE BANNER (Hidden by default) -->
+                <!-- COLLAPSIBLE LOWER PRICE BANNER -->
                 <div id="lower-price-banner-container" class="hidden">
                     <details class="group bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 shadow-sm transition">
                         <summary class="cursor-pointer flex items-center justify-between text-xs sm:text-sm font-bold text-emerald-800 dark:text-emerald-300 select-none">
@@ -72,6 +72,55 @@
             <div id="detail-comparison-loading" class="text-sm text-gray-400 py-4 animate-pulse">Checking live prices at other shops...</div>
             <div id="detail-comparison-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2"></div>
         </div>
+
+        <!-- PRODUCT REVIEWS SECTION -->
+        <div class="pt-12 border-t border-gray-100 dark:border-gray-800 mt-12 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-xl font-black text-gray-900 dark:text-white tracking-tight">Customer Reviews</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">See what others think about this product.</p>
+                </div>
+                <button onclick="toggleReviewModal()" class="bg-brand-dark hover:bg-black dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl transition shadow-sm text-sm flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    Write a Review
+                </button>
+            </div>
+            
+            <div id="reviews-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Reviews populated by JS -->
+                <div class="text-sm text-gray-400 py-4 animate-pulse">Loading reviews...</div>
+            </div>
+        </div>
+
     </div>
 </section>
+
+<!-- REVIEW MODAL -->
+<div id="review-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl animate-slideUp">
+        <h3 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white mb-2">Write a Review</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-6">Share your thoughts on this product with the community.</p>
+
+        <form id="review-form" onsubmit="submitReview(event)" class="space-y-5">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Rating</label>
+                <select id="review-rating" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-dark dark:focus:ring-emerald-500 cursor-pointer">
+                    <option value="5">⭐⭐⭐⭐⭐ (5) - Excellent</option>
+                    <option value="4">⭐⭐⭐⭐ (4) - Good</option>
+                    <option value="3">⭐⭐⭐ (3) - Average</option>
+                    <option value="2">⭐⭐ (2) - Poor</option>
+                    <option value="1">⭐ (1) - Terrible</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Comment</label>
+                <textarea id="review-comment" rows="4" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-dark dark:focus:ring-emerald-500" required placeholder="Share your experience..."></textarea>
+            </div>
+            <div class="flex items-center justify-end space-x-3 pt-2">
+                <button type="button" onclick="toggleReviewModal()" class="px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl transition cursor-pointer">Cancel</button>
+                <button type="submit" class="px-5 py-2.5 bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold text-xs rounded-xl transition shadow-sm cursor-pointer">Submit</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

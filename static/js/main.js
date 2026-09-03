@@ -8,6 +8,9 @@ let allSavedBaskets = [];
 let currentInspectedSavedBasket = null;
 let currentActiveProduct = null;
 let isCartInitialized = false;
+let isUserAuthenticated = false;
+let showClearConfirmation = false;
+let currentStoreData = []; // Stores processed cart data for side-by-side view
 
 const categoryKeywords = {
     'Milk': ['milk', 'dairy', 'butter', 'cheese', 'yogurt', 'cream', 'lank', '2l', '1l'],
@@ -114,6 +117,28 @@ function toggleMobileMenu() {
     }
 }
 
+function switchBasketTab(tabName) {
+    const btnTotals = document.getElementById('tab-btn-totals');
+    const btnSbs = document.getElementById('tab-btn-sbs');
+    const contentTotals = document.getElementById('tab-content-totals');
+    const contentSbs = document.getElementById('tab-content-sbs');
+
+    if (!btnTotals || !btnSbs || !contentTotals || !contentSbs) return;
+
+    if (tabName === 'totals') {
+        btnTotals.className = "px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer bg-brand-dark dark:bg-emerald-600 text-white shadow-sm";
+        btnSbs.className = "px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white";
+        contentTotals.classList.remove('hidden');
+        contentSbs.classList.add('hidden');
+    } else {
+        btnSbs.className = "px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer bg-brand-dark dark:bg-emerald-600 text-white shadow-sm";
+        btnTotals.className = "px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white";
+        contentSbs.classList.remove('hidden');
+        contentTotals.classList.add('hidden');
+        setTimeout(executeSideBySide, 0);
+    }
+}
+
 // ==========================================
 // 3. CORE DATA & HELPER FUNCTIONS
 // ==========================================
@@ -208,18 +233,27 @@ function bentoCard(p, idx = -1) {
 }
 
 // ==========================================
-// 4. BASKET LOGIC & BACKEND SYNC
+// 4. BASKET LOGIC & HYBRID STORAGE SYNC
 // ==========================================
 async function loadActiveBasketFromStorage() {
     try {
         const res = await fetch(`${API}/api/db/active-cart`);
         if (res.ok) {
             const data = await res.json();
-            basket = data.items || [];
+            isUserAuthenticated = data.authenticated !== false;
+            
+            if (isUserAuthenticated) {
+                basket = data.items || [];
+            } else {
+                const localCart = localStorage.getItem('smartBasket_guest_active');
+                basket = localCart ? JSON.parse(localCart) : [];
+            }
             basket.forEach(registerProduct);
         }
     } catch (e) {
-        basket = [];
+        const localCart = localStorage.getItem('smartBasket_guest_active');
+        basket = localCart ? JSON.parse(localCart) : [];
+        basket.forEach(registerProduct);
     }
     isCartInitialized = true;
     updateGlobalBasketCounter();
@@ -230,12 +264,17 @@ async function loadActiveBasketFromStorage() {
 }
 
 function saveActiveBasketToStorage() {
-    if (!isCartInitialized) return; // Prevent overwriting during initial load race conditions
-    fetch(`${API}/api/db/active-cart`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: basket })
-    }).catch(err => console.error('Failed to sync active cart', err));
+    if (!isCartInitialized) return; 
+    
+    if (isUserAuthenticated) {
+        fetch(`${API}/api/db/active-cart`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: basket })
+        }).catch(err => console.error('Failed to sync active cart', err));
+    } else {
+        localStorage.setItem('smartBasket_guest_active', JSON.stringify(basket));
+    }
 }
 
 function updateGlobalBasketCounter() {
@@ -296,10 +335,24 @@ function removeFromBasket(index) {
 }
 
 function clearEntireBasket() {
-    if (!confirm("Are you sure you want to clear your entire basket?")) return;
-    basket = [];
+    if (basket.length === 0) return;
+    showClearConfirmation = true;
     updateBasketPageUI();
-    showToast("Basket cleared.");
+}
+
+function cancelClearBasket() {
+    showClearConfirmation = false;
+    updateBasketPageUI();
+}
+
+function confirmClearBasket() {
+    basket = [];
+    if (!isUserAuthenticated) {
+        localStorage.removeItem('smartBasket_guest_active');
+    }
+    showClearConfirmation = false;
+    updateBasketPageUI();
+    showToast("Basket cleared successfully.");
 }
 
 function initLogoutInterceptor() {
@@ -307,7 +360,6 @@ function initLogoutInterceptor() {
         const logoutLink = e.target.closest('a[href="/logout"]');
         if (logoutLink) {
             e.preventDefault();
-            // Behind-the-scenes auto-save to user's saved lists if cart has items
             if (basket && basket.length > 0) {
                 try {
                     await fetch(`${API}/api/db/save-basket`, {
@@ -318,11 +370,8 @@ function initLogoutInterceptor() {
                             items: basket
                         })
                     });
-                } catch (err) {
-                    console.error('Failed to auto-save cart on logout', err);
-                }
+                } catch (err) {}
             }
-            // Clear active cart on backend session
             try {
                 await fetch(`${API}/api/db/active-cart`, {
                     method: 'POST',
@@ -339,7 +388,6 @@ function initLogoutInterceptor() {
 // ==========================================
 // 5. PAGE INITIALIZERS & RENDERERS
 // ==========================================
-
 async function initLandingPage() {
     const unifiedBottomGrid = document.getElementById('unified-bottom-grid');
     if (!unifiedBottomGrid) return;
@@ -414,6 +462,9 @@ async function initProductDetailPage() {
     detailComparisonLoading.classList.remove('hidden');
     detailComparisonGrid.innerHTML = '';
     
+    // NEW: Fetch Reviews for this product
+    fetchProductReviews(p.id);
+
     try {
         const cmpRes = await fetch(`${API}/api/compare?q=${encodeURIComponent(p.name)}`);
         const cmpData = await cmpRes.json();
@@ -482,6 +533,33 @@ function updateBasketPageUI() {
     const countEl = document.getElementById('basket-page-count');
     if (countEl) countEl.textContent = basket.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
+    const headerActionEl = document.querySelector('#basket-page-items-list').previousElementSibling;
+    if (headerActionEl) {
+        if (showClearConfirmation) {
+            headerActionEl.innerHTML = `
+                <div class="flex items-center justify-between w-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl p-3 animate-pulse">
+                    <span class="text-xs font-bold text-red-600 dark:text-red-400">Clear entire list?</span>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="cancelClearBasket()" class="px-3 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl border border-gray-200 dark:border-gray-800 transition cursor-pointer">Cancel</button>
+                        <button onclick="confirmClearBasket()" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition shadow-sm cursor-pointer">Yes, Clear</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            headerActionEl.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Items List</h2>
+                    <span class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full"><span id="basket-page-count">${basket.reduce((sum, item) => sum + (item.quantity || 1), 0)}</span> Items</span>
+                </div>
+                <button onclick="clearEntireBasket()" class="p-2 bg-gray-50 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-950/50 text-gray-400 hover:text-red-600 rounded-xl transition cursor-pointer" title="Delete Whole List">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            `;
+        }
+    }
+
     const listEl = document.getElementById('basket-page-items-list');
     if (!listEl) return;
     
@@ -532,30 +610,69 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
 
     if (items.length === 0) {
         container.innerHTML = `<p class="text-sm font-medium text-gray-400 text-center py-12">Add products to view total store cost comparison.</p>`;
+        const sbsContainer = document.getElementById('basket-page-sbs-container');
+        if (sbsContainer) sbsContainer.innerHTML = `<div class="p-8 text-center text-gray-400 text-xs font-medium">Add items to basket to enable comparison.</div>`;
         return;
     }
 
     if (isActiveBasket) {
-        container.innerHTML = `<div class="flex flex-col justify-center items-center py-12"><span class="flex h-3 w-3 relative mb-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span></span><p class="text-sm font-medium text-gray-500 animate-pulse">Calculating real store totals...</p></div>`;
-        let fetchedAny = false;
-        for (let i = 0; i < items.length; i++) {
-            let item = items[i];
-            if (!item.competitors || item.competitors.length === 0) {
-                fetchedAny = true;
-                try {
-                    const res = await fetch(`${API}/api/compare?q=${encodeURIComponent(item.name)}`);
-                    const data = await res.json();
-                    if (data.found && data.products) {
-                        item.competitors = data.products.filter(p => p.id !== item.id && p.price > 0);
-                    } else {
-                        item.competitors = [];
-                    }
-                } catch (e) {
-                    item.competitors = [];
+        const skeletonCards = Array(4).fill(0).map((_, i) => `
+            <div class="border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-2xl p-4 sm:p-5 shadow-2xs relative overflow-hidden">
+                <div class="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent"></div>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                    <div class="flex items-center space-x-3">
+                        <div class="h-8 sm:h-9 w-24 sm:w-28 bg-gray-200 dark:bg-gray-800 rounded-xl animate-pulse"></div>
+                    </div>
+                    <div class="h-7 sm:h-8 w-20 sm:w-24 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse"></div>
+                </div>
+                <div class="pt-2 border-t border-gray-50 dark:border-gray-800/50 mt-2">
+                    <div class="h-3 sm:h-4 w-32 sm:w-40 bg-gray-100 dark:bg-gray-800 rounded animate-pulse"></div>
+                </div>
+            </div>
+        `).join('');
+
+        container.innerHTML = `
+            <div class="flex items-center justify-between mb-4 px-2">
+                <div class="flex items-center space-x-2">
+                    <span class="flex h-2.5 w-2.5 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-dark dark:bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-dark dark:bg-emerald-500"></span>
+                    </span>
+                    <span class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Live Matching...</span>
+                </div>
+            </div>
+            <div class="space-y-4">
+                ${skeletonCards}
+            </div>
+        `;
+        
+        let itemsToFetch = items.filter(item => !item.competitors || item.competitors.length === 0);
+        
+        if (itemsToFetch.length > 0) {
+            let queries = itemsToFetch.map(item => item.name);
+            
+            try {
+                const res = await fetch(`${API}/api/batch-compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ queries: queries })
+                });
+                
+                if (res.ok) {
+                    const batchData = await res.json();
+                    
+                    itemsToFetch.forEach(item => {
+                        const matchingProducts = batchData[item.name] || [];
+                        item.competitors = matchingProducts.filter(p => p.id !== item.id && p.price > 0);
+                    });
+                    
+                    saveActiveBasketToStorage();
                 }
+            } catch (e) {
+                console.error("Batch compare failed", e);
+                itemsToFetch.forEach(item => item.competitors = []);
             }
         }
-        if (fetchedAny) saveActiveBasketToStorage();
     }
 
     const storeNames = ['Pick n Pay', 'Shoprite', 'Checkers', 'Woolworths'];
@@ -595,6 +712,7 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
     });
 
     storeData.sort((a, b) => a.total - b.total);
+    currentStoreData = storeData; // Save globally for the side-by-side view
 
     if (storeData.length === 0) return;
 
@@ -614,10 +732,10 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
         heroSummary.classList.remove('hidden');
     }
 
-    container.innerHTML = storeData.map((s, index) => {
+    const mainListHtml = storeData.map((s, index) => {
         const isWinner = index === 0;
         return `
-            <div class="${isWinner ? 'border-2 border-brand-dark dark:border-emerald-500 bg-gray-50 dark:bg-gray-800/50' : 'border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'} rounded-2xl p-4 sm:p-5 shadow-2xs transition-colors">
+            <div class="${isWinner ? 'border-2 border-brand-dark dark:border-emerald-500 bg-gray-50 dark:bg-gray-800/50' : 'border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'} rounded-2xl p-4 sm:p-5 shadow-2xs transition-colors mb-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
                     <div class="flex items-center space-x-3">
                         ${getStoreBadge(s.name)}
@@ -659,6 +777,114 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
             </div>
         `;
     }).join('');
+
+    container.innerHTML = mainListHtml;
+    
+    const sbsContainer = document.getElementById('basket-page-sbs-container');
+    if (sbsContainer) {
+        sbsContainer.innerHTML = getSideBySideUIHtml(storeData);
+        setTimeout(executeSideBySide, 0);
+    }
+}
+
+function getSideBySideUIHtml(storeData) {
+    if (storeData.length < 2) return '<div class="p-8 text-center text-gray-400 text-xs font-medium">At least two stores with pricing are required for side-by-side comparison.</div>';
+    const storeOptions = storeData.map(s => `<option value="${s.name}">${s.name} (R ${s.total.toFixed(2)})</option>`).join('');
+
+    return `
+        <div class="animate-slideUp">
+            <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
+                <select id="sbs-store-a" onchange="executeSideBySide()" class="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:ring-2 focus:ring-brand-dark dark:focus:ring-emerald-500 shadow-sm transition-all">
+                    ${storeOptions}
+                </select>
+                <div class="hidden sm:flex items-center justify-center text-gray-400 font-black text-sm px-2">VS</div>
+                <select id="sbs-store-b" onchange="executeSideBySide()" class="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white outline-none cursor-pointer focus:ring-2 focus:ring-brand-dark dark:focus:ring-emerald-500 shadow-sm transition-all">
+                    ${storeOptions}
+                </select>
+            </div>
+            <div id="sbs-results-container" class="w-full overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                <!-- Table injected here by executeSideBySide() -->
+            </div>
+        </div>
+    `;
+}
+
+function executeSideBySide() {
+    const selectA = document.getElementById('sbs-store-a');
+    const selectB = document.getElementById('sbs-store-b');
+    const container = document.getElementById('sbs-results-container');
+
+    if (!container || !currentStoreData || !selectA || !selectB) return;
+    
+    // Auto-select a different Store B if they are identical on first load
+    if (selectA.selectedIndex === selectB.selectedIndex && selectB.options.length > 1) {
+        selectB.selectedIndex = selectA.selectedIndex === 0 ? 1 : 0;
+    }
+
+    const valA = selectA.value;
+    const valB = selectB.value;
+
+    const storeA = currentStoreData.find(s => s.name === valA);
+    const storeB = currentStoreData.find(s => s.name === valB);
+
+    if (!storeA || !storeB) return;
+
+    if (valA === valB) {
+        container.innerHTML = `<div class="p-8 text-center text-gray-500 dark:text-gray-400 text-sm font-medium bg-gray-50 dark:bg-gray-900">Please select two different stores to compare.</div>`;
+        return;
+    }
+
+    let rowsHtml = '';
+    for (let i = 0; i < storeA.items.length; i++) {
+        const itemA = storeA.items[i];
+        const itemB = storeB.items[i];
+
+        const isACheaper = itemA.displaySubtotal < itemB.displaySubtotal;
+        const isBCheaper = itemB.displaySubtotal < itemA.displaySubtotal;
+
+        rowsHtml += `
+            <tr class="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
+                <td class="p-3 sm:p-4 min-w-[130px] align-middle">
+                    <span class="text-xs font-bold text-gray-900 dark:text-white block leading-snug">${itemA.originalName}</span>
+                    <span class="text-[10px] text-gray-500 dark:text-gray-400 font-semibold mt-1 block uppercase tracking-wider">Qty: ${itemA.qty}</span>
+                </td>
+                <td class="p-3 sm:p-4 text-center border-l border-gray-100 dark:border-gray-800 align-middle">
+                    <span class="block text-sm sm:text-base font-black ${isACheaper ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}">R ${itemA.displaySubtotal.toFixed(2)}</span>
+                    ${itemA.notFound ? `<span class="text-[9px] font-bold text-red-500 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded mt-1 inline-block">N/A</span>` : (itemA.isExact ? '' : `<span class="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded mt-1 inline-block">Equivalent</span>`)}
+                </td>
+                <td class="p-3 sm:p-4 text-center border-l border-gray-100 dark:border-gray-800 align-middle">
+                    <span class="block text-sm sm:text-base font-black ${isBCheaper ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}">R ${itemB.displaySubtotal.toFixed(2)}</span>
+                    ${itemB.notFound ? `<span class="text-[9px] font-bold text-red-500 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded mt-1 inline-block">N/A</span>` : (itemB.isExact ? '' : `<span class="text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded mt-1 inline-block">Equivalent</span>`)}
+                </td>
+            </tr>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left border-collapse min-w-[320px]">
+                <thead>
+                    <tr class="bg-gray-100 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
+                        <th class="p-3 sm:p-4 text-[10px] sm:text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-2/5">Product</th>
+                        <th class="p-3 sm:p-4 text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest text-center w-[30%] border-l border-gray-200 dark:border-gray-700">${storeA.name}</th>
+                        <th class="p-3 sm:p-4 text-[10px] sm:text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest text-center w-[30%] border-l border-gray-200 dark:border-gray-700">${storeB.name}</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
+                    ${rowsHtml}
+                    <tr class="bg-gray-50 dark:bg-gray-800/80">
+                        <td class="p-3 sm:p-4 text-xs sm:text-sm font-black text-gray-900 dark:text-white text-right uppercase tracking-widest">TOTAL</td>
+                        <td class="p-3 sm:p-4 text-center border-l border-gray-200 dark:border-gray-700">
+                            <span class="text-base sm:text-lg font-black ${storeA.total < storeB.total ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}">R ${storeA.total.toFixed(2)}</span>
+                        </td>
+                        <td class="p-3 sm:p-4 text-center border-l border-gray-200 dark:border-gray-700">
+                            <span class="text-base sm:text-lg font-black ${storeB.total < storeA.total ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'}">R ${storeB.total.toFixed(2)}</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 // ==========================================
@@ -669,6 +895,15 @@ function openSaveBasketModal() {
         showToast('Your basket is empty. Add items before saving.');
         return;
     }
+    
+    if (!isUserAuthenticated) {
+        showToast('Please log in to save baskets and view price snapshots.');
+        setTimeout(() => {
+            window.location.href = '/login';
+        }, 1200);
+        return;
+    }
+    
     const modal = document.getElementById('save-basket-modal');
     if (modal) {
         document.getElementById('saved-basket-name-input').value = `My Basket (${new Date().toLocaleDateString()})`;
@@ -810,11 +1045,12 @@ function renderSavedBasketComparison(items, containerId) {
     });
 
     storeData.sort((a, b) => a.total - b.total);
+    currentStoreData = storeData; // Save globally for the side-by-side view
 
-    container.innerHTML = storeData.map((s, index) => {
+    const mainListHtml = storeData.map((s, index) => {
         const isWinner = index === 0;
         return `
-            <div class="${isWinner ? 'border-2 border-brand-dark dark:border-emerald-500 bg-gray-50 dark:bg-gray-800/50' : 'border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'} rounded-2xl p-4 sm:p-5 shadow-2xs transition-colors">
+            <div class="${isWinner ? 'border-2 border-brand-dark dark:border-emerald-500 bg-gray-50 dark:bg-gray-800/50' : 'border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'} rounded-2xl p-4 sm:p-5 shadow-2xs transition-colors mb-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
                     <div class="flex items-center space-x-3">
                         ${getStoreBadge(s.name)}
@@ -856,6 +1092,14 @@ function renderSavedBasketComparison(items, containerId) {
             </div>
         `;
     }).join('');
+
+    container.innerHTML = mainListHtml;
+    
+    const sbsContainer = document.getElementById('basket-page-sbs-container');
+    if (sbsContainer) {
+        sbsContainer.innerHTML = getSideBySideUIHtml(storeData);
+        setTimeout(executeSideBySide, 0);
+    }
 }
 
 async function initSavedBasketDetailPage() {
@@ -886,12 +1130,22 @@ async function initSavedBasketDetailPage() {
 
 async function deleteSavedBasket(e, id) {
     if (e) e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this saved basket?")) return;
+    
+    if (!confirm("Are you sure you want to delete this saved basket?")) {
+        return;
+    }
+    
     try {
-        await fetch(`${API}/api/db/saved-baskets/${id}`, { method: 'DELETE' });
-        showToast('Deleted from database');
-        renderSavedBasketsList();
-    } catch (e) { showToast('Deletion failed'); }
+        const res = await fetch(`${API}/api/db/saved-baskets/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Saved list deleted successfully');
+            renderSavedBasketsList();
+        } else {
+            showToast('Failed to delete list');
+        }
+    } catch (e) { 
+        showToast('Database connection error'); 
+    }
 }
 
 function loadSavedBasketAsActive() {
@@ -908,4 +1162,89 @@ function goBackFromSavedBasketDetail() {
 
 function goBack() {
     window.history.back();
+} 
+
+// ==========================================
+// 7. PRODUCT REVIEWS LOGIC
+// ==========================================
+async function fetchProductReviews(productId) {
+    const container = document.getElementById('reviews-container');
+    if (!container) return;
+    
+    try {
+        const res = await fetch(`${API}/api/reviews/${encodeURIComponent(productId)}`);
+        const reviews = await res.json();
+        
+        if (reviews.length === 0) {
+            container.innerHTML = `<div class="col-span-full py-8 text-center text-sm font-semibold text-gray-400 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl">No reviews yet. Be the first to review!</div>`;
+            return;
+        }
+        
+        container.innerHTML = reviews.map(r => `
+            <div class="bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-3xl p-5 sm:p-6 transition-all hover:shadow-sm">
+                <div class="flex items-center justify-between mb-3 border-b border-gray-200 dark:border-gray-800 pb-3">
+                    <span class="font-black text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                        <span class="h-6 w-6 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xs">
+                            ${r.author_name.charAt(0).toUpperCase()}
+                        </span>
+                        ${r.author_name}
+                    </span>
+                    <span class="text-xs font-semibold text-gray-400">${r.date}</span>
+                </div>
+                <div class="flex items-center mb-3">
+                    ${Array(5).fill(0).map((_, i) => `<span class="text-xl ${i < r.rating ? 'text-yellow-400' : 'text-gray-200 dark:text-gray-800'}">★</span>`).join('')}
+                </div>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">${r.comment}</p>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = `<p class="col-span-full text-xs text-red-400 py-4 font-semibold text-center">Failed to load reviews.</p>`;
+    }
+}
+
+function toggleReviewModal() {
+    if (!isUserAuthenticated) {
+        showToast('Please log in to write a review.');
+        setTimeout(() => {
+            window.location.href = '/login';
+        }, 1200);
+        return;
+    }
+    
+    const modal = document.getElementById('review-modal');
+    if (modal) {
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+            document.getElementById('review-rating').value = '5';
+            document.getElementById('review-comment').value = '';
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
+}
+
+async function submitReview(e) {
+    e.preventDefault();
+    if (!currentActiveProduct) return;
+    
+    const rating = document.getElementById('review-rating').value;
+    const comment = document.getElementById('review-comment').value;
+    
+    try {
+        const res = await fetch(`${API}/api/reviews/${encodeURIComponent(currentActiveProduct.id)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rating, comment })
+        });
+        
+        if (res.ok) {
+            toggleReviewModal();
+            showToast('Review submitted successfully!');
+            fetchProductReviews(currentActiveProduct.id);
+        } else {
+            showToast('Failed to submit review.');
+        }
+    } catch (err) {
+        showToast('Connection error while submitting review.');
+    }
 }

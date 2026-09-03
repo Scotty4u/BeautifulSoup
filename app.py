@@ -6,10 +6,10 @@ import sqlite3
 import tempfile
 import threading
 import time
-import difflib
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+from rapidfuzz import fuzz
 from apscheduler.schedulers.background import BackgroundScheduler
 from fake_useragent import UserAgent
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for
@@ -79,12 +79,12 @@ class User(db.Model):
 class Product(db.Model):
     __tablename__ = 'products'
     id = db.Column(db.String(100), primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    store = db.Column(db.String(50), nullable=False)
+    name = db.Column(db.String(255), nullable=False, index=True)
+    store = db.Column(db.String(50), nullable=False, index=True)
     price = db.Column(db.Float, nullable=False)
     formatted_price = db.Column(db.String(20))
     image_url = db.Column(db.Text)
-    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 class UserPreference(db.Model):
     __tablename__ = 'user_preferences'
@@ -116,6 +116,15 @@ class BasketItem(db.Model):
     price = db.Column(db.Float, nullable=True)
     competitor_prices = db.Column(db.Text, nullable=True)
     product = db.relationship('Product')
+
+class Review(db.Model):
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.String(100), index=True, nullable=False)
+    author_name = db.Column(db.String(100), default='Anonymous')
+    rating = db.Column(db.Integer, nullable=False)
+    comment = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 with app.app_context():
     db.create_all()
@@ -236,28 +245,65 @@ def refresh_tokens_sync():
 # ==========================================
 # MATCHING & UTILITIES
 # ==========================================
+RETAILER_STOPWORDS = {'pnp', 'pick', 'pay', 'shoprite', 'checkers', 'woolworths', 'woolies', 'housebrand', 'ritebrand', 'simple', 'truth', 'the', 'and', 'fresh', 'superior'}
+
+def normalize_units(text: str) -> str:
+    """Standardizes unit expressions (e.g., 2000ml -> 2l, 1000g -> 1kg)."""
+    text = text.lower()
+    text = re.sub(r'(\d+)\s*(litre|litres|liter|liters|l\b)', r'\1l', text)
+    text = re.sub(r'2000\s*ml', '2l', text)
+    text = re.sub(r'1000\s*ml', '1l', text)
+    text = re.sub(r'500\s*ml', '0.5l', text)
+    text = re.sub(r'1000\s*g\b', '1kg', text)
+    text = re.sub(r'(\d+)\s*(kilogram|kilograms|kg\b)', r'\1kg', text)
+    text = re.sub(r'(\d+)\s*(gram|grams|g\b)', r'\1g', text)
+    return text
+
+def extract_features(title: str):
+    """Cleans title, removes store names, and extracts standard size."""
+    normalized = normalize_units(title)
+    
+    # Extract size pattern (e.g., 2l, 500g, 6x330ml)
+    size_match = re.search(r'\b(\d+(?:\.\d+)?(?:kg|g|l|ml)|(?:\d+x\d+ml))\b', normalized)
+    size = size_match.group(0) if size_match else ""
+    
+    # Remove non-alphanumeric except spaces
+    cleaned = re.sub(r'[^a-z0-9\s]', ' ', normalized)
+    
+    # Remove retailer stopwords
+    tokens = [w for w in cleaned.split() if w not in RETAILER_STOPWORDS and len(w) > 1]
+    
+    return {
+        'clean_text': " ".join(tokens),
+        'tokens': set(tokens),
+        'size': size
+    }
+
+def calculate_match_score(target_title: str, candidate_title: str):
+    target_feat = extract_features(target_title)
+    candidate_feat = extract_features(candidate_title)
+    
+    # 1. Size Mismatch Penalty
+    if target_feat['size'] and candidate_feat['size']:
+        if target_feat['size'] != candidate_feat['size']:
+            return 0, False # Size mismatch cannot be an equivalent match
+            
+    # 2. Compute Token Similarity (order-agnostic)
+    similarity = fuzz.token_set_ratio(
+        target_feat['clean_text'], 
+        candidate_feat['clean_text']
+    )
+    
+    # 3. Determine Match Type
+    is_exact = similarity >= 88 and target_feat['size'] == candidate_feat['size']
+    return similarity, is_exact
+
 def optimize_search_query(query: str) -> str:
     cleaned = re.sub(r'\b(pnp|woolworths|shoprite|checkers|finest|store|superior|sliced|thick slice|fresh)\b', '', query, flags=re.IGNORECASE)
-    words = [w for w in cleaned.split() if len(w) > 1][:5]
+    words = [w for w in cleaned.split() if len(w) > 1][:4]
     return " ".join(words).strip()
 
-def extract_size(product_name: str):
-    match = re.search(r'(\d+(?:\.\d+)?\s*(?:ml|l|g|kg|litre|litres))', product_name, flags=re.IGNORECASE)
-    if match:
-        return match.group(1).replace(" ", "").lower()
-    return None
-
 def filter_and_score_competitors(original_name: str, scraped_results: list) -> list:
-    target_size = extract_size(original_name)
-    stop_words = {'the', 'and', 'fresh', 'superior', 'sliced', 'thick', 'slice', 'grade', 'full', 'cream', 'long', 'life', 'white', 'brown', 'regular', 'classic'}
-    
-    def get_clean_tokens(name):
-        cleaned = re.sub(r'(\d+(?:\.\d+)?\s*(?:ml|l|g|kg|litre|litres))', '', name, flags=re.IGNORECASE)
-        words = re.findall(r'\b[a-zA-Z]{2,}\b', cleaned.lower())
-        return {w for w in words if w not in stop_words}
-
-    target_tokens = get_clean_tokens(original_name)
-    
     store_groups = {}
     for item in scraped_results:
         if item.get('price', 0) <= 0:
@@ -272,43 +318,28 @@ def filter_and_score_competitors(original_name: str, scraped_results: list) -> l
     for store, items in store_groups.items():
         best_match = None
         highest_score = 0
-        is_exact = False
+        best_is_exact = False
         
         for item in items:
             item_name = item.get('name', '')
-            item_size = extract_size(item_name)
+            score, is_exact = calculate_match_score(original_name, item_name)
             
-            if target_size and item_size and target_size != item_size:
-                continue
-                
-            item_tokens = get_clean_tokens(item_name)
-            if not target_tokens or not item_tokens:
-                continue
-                
-            intersection = target_tokens.intersection(item_tokens)
-            union = target_tokens.union(item_tokens)
-            jaccard_score = len(intersection) / len(union) if union else 0
-            seq_similarity = difflib.SequenceMatcher(None, original_name.lower(), item_name.lower()).ratio()
-            
-            if len(intersection) >= min(2, len(target_tokens)) or jaccard_score >= 0.35:
-                score = jaccard_score + (seq_similarity * 0.5)
-                
-                if score > highest_score:
-                    highest_score = score
-                    best_match = item
-                    is_exact = bool(seq_similarity >= 0.70 or target_tokens == item_tokens)
+            if score > highest_score:
+                highest_score = score
+                best_match = item
+                best_is_exact = is_exact
 
-        if best_match:
-            best_match['is_exact_match'] = is_exact
-            best_match['isExact'] = is_exact
+        if best_match and highest_score >= 65:  # Confidence Threshold
+            best_match['is_exact_match'] = best_is_exact
+            best_match['isExact'] = best_is_exact
+            best_match['score'] = highest_score
             final_results.append(best_match)
         elif items:
-            same_size = [i for i in items if not target_size or extract_size(i.get('name', '')) == target_size]
-            pool = same_size if same_size else items
-            pool.sort(key=lambda x: x['price'])
-            fallback = pool[0]
+            items.sort(key=lambda x: x['price'])
+            fallback = items[0]
             fallback['is_exact_match'] = False
             fallback['isExact'] = False
+            fallback['score'] = 0
             final_results.append(fallback)
             
     final_results.sort(key=lambda x: x['price'])
@@ -674,22 +705,76 @@ async def internal_fetch_competitors(query: str):
     all_results = pnp_res + sr_res + ch_res + ww_res
     return filter_and_score_competitors(query, all_results)
 
+@app.route('/api/batch-compare', methods=['POST'])
+def batch_compare():
+    data = request.json or {}
+    queries = data.get('queries', [])
+    
+    if not queries:
+        return jsonify({})
+
+    async def fetch_all_competitors():
+        tasks = [internal_fetch_competitors(q) for q in queries]
+        results = await asyncio.gather(*tasks)
+        return dict(zip(queries, results))
+        
+    batch_results = asyncio.run(fetch_all_competitors())
+    
+    return jsonify(batch_results)
+
 # --- Active Cart & Saved Basket Endpoints ---
-# --- Active Cart & Saved Basket Endpoints ---
+
+@app.route('/api/reviews/<path:product_id>', methods=['GET'])
+def get_reviews(product_id):
+    reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
+    return jsonify([{
+        'id': r.id,
+        'author_name': r.author_name,
+        'rating': r.rating,
+        'comment': r.comment,
+        'date': r.created_at.strftime('%Y-%m-%d %H:%M')
+    } for r in reviews])
+
+@app.route('/api/reviews/<path:product_id>', methods=['POST'])
+def add_review(product_id):
+    if 'username' not in session:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    data = request.json or {}
+    rating = int(data.get('rating', 5))
+    comment = data.get('comment', '').strip()
+    
+    author = session.get('username')
+    
+    if not comment:
+        return jsonify({'error': 'Comment is required'}), 400
+        
+    new_review = Review(
+        product_id=product_id, 
+        author_name=author, 
+        rating=rating, 
+        comment=comment
+    )
+    
+    db.session.add(new_review)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
 @app.route('/api/db/active-cart', methods=['GET', 'POST'])
 def handle_active_cart():
     user_id = session.get('user_id')
     if not user_id:
-        return jsonify({'items': []})
+        return jsonify({'authenticated': False, 'items': []})
     
     if request.method == 'GET':
         cart_record = db.session.get(ActiveCart, user_id)
         if cart_record and cart_record.items_json:
             try:
-                return jsonify({'items': json.loads(cart_record.items_json)})
+                return jsonify({'authenticated': True, 'items': json.loads(cart_record.items_json)})
             except:
                 pass
-        return jsonify({'items': []})
+        return jsonify({'authenticated': True, 'items': []})
     
     elif request.method == 'POST':
         data = request.json or {}
@@ -701,7 +786,7 @@ def handle_active_cart():
         else:
             cart_record.items_json = json.dumps(items)
         db.session.commit()
-        return jsonify({'success': True})
+        return jsonify({'authenticated': True, 'success': True})
 
 @app.route('/api/db/saved-baskets', methods=['GET'])
 def get_db_saved_baskets():
@@ -778,7 +863,7 @@ def delete_db_basket(basket_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
+    
 # ==========================================
 # HTML FRONTEND ROUTES
 # ==========================================
