@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import threading
 import time
+import uuid
 from datetime import datetime
 from typing import Dict, List, Tuple
 
@@ -74,17 +75,62 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Core UML Relationships
     baskets = db.relationship('SavedBasket', backref='owner', lazy=True, cascade="all, delete-orphan")
+    preference = db.relationship('UserPreference', backref='user', uselist=False, cascade="all, delete-orphan")
+    active_cart = db.relationship('ActiveCart', backref='user', uselist=False, cascade="all, delete-orphan")
+    reviews = db.relationship('Review', backref='user', lazy=True, cascade="all, delete-orphan")
+    
+    # Preserved Latest System Features
+    collaborations = db.relationship('SavedBasketCollaborator', backref='user', lazy=True)
+    notifications_received = db.relationship('Notification', foreign_keys='Notification.recipient_id', backref='recipient', lazy=True)
+
+class Store(db.Model):
+    __tablename__ = 'stores'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    store_key = db.Column(db.String(50))
+    logo_url = db.Column(db.String(255))
+    website_url = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    products = db.relationship('Product', backref='store_ref', lazy=True)
+
+class Category(db.Model):
+    __tablename__ = 'categories'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    icon_url = db.Column(db.String(255))
+    
+    products = db.relationship('Product', backref='category_ref', lazy=True)
 
 class Product(db.Model):
     __tablename__ = 'products'
     id = db.Column(db.String(100), primary_key=True)
     name = db.Column(db.String(255), nullable=False, index=True)
-    store = db.Column(db.String(50), nullable=False, index=True)
     price = db.Column(db.Float, nullable=False)
     formatted_price = db.Column(db.String(20))
     image_url = db.Column(db.Text)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
+    # Updated to match UML FKs (Kept 'store' string for scraper backwards compatibility)
+    store_id = db.Column(db.Integer, db.ForeignKey('stores.id'), nullable=True) 
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
+    store = db.Column(db.String(50), index=True) 
+    
+    # UML Relationships
+    price_history = db.relationship('PriceHistory', backref='product_ref', lazy=True, cascade="all, delete-orphan")
+    reviews = db.relationship('Review', backref='product_ref', lazy=True, cascade="all, delete-orphan")
+
+class PriceHistory(db.Model):
+    __tablename__ = 'price_history'
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.String(100), db.ForeignKey('products.id'), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    store_name = db.Column(db.String(100))
 
 class UserPreference(db.Model):
     __tablename__ = 'user_preferences'
@@ -102,10 +148,16 @@ class ActiveCart(db.Model):
 class SavedBasket(db.Model):
     __tablename__ = 'saved_baskets'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    items = db.relationship('BasketItem', backref='basket', lazy=True, cascade="all, delete-orphan")
+    
+    # Preserved Latest System Features
+    share_token = db.Column(db.String(64), unique=True, default=lambda: uuid.uuid4().hex) 
+    is_collaborative = db.Column(db.Boolean, default=False)
+    
+    items = db.relationship('BasketItem', backref='basket', cascade='all, delete-orphan')
+    collaborators = db.relationship('SavedBasketCollaborator', backref='basket_ref', cascade='all, delete-orphan')
 
 class BasketItem(db.Model):
     __tablename__ = 'basket_items'
@@ -115,15 +167,38 @@ class BasketItem(db.Model):
     quantity = db.Column(db.Integer, default=1)
     price = db.Column(db.Float, nullable=True)
     competitor_prices = db.Column(db.Text, nullable=True)
+    
     product = db.relationship('Product')
 
 class Review(db.Model):
     __tablename__ = 'reviews'
     id = db.Column(db.Integer, primary_key=True)
-    product_id = db.Column(db.String(100), index=True, nullable=False)
-    author_name = db.Column(db.String(100), default='Anonymous')
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False) 
+    product_id = db.Column(db.String(100), db.ForeignKey('products.id'), index=True, nullable=False) 
     rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text, nullable=False)
+    helpful_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Kept for routing compatibility
+    author_name = db.Column(db.String(100), default='Anonymous')
+
+class SavedBasketCollaborator(db.Model):
+    __tablename__ = 'saved_basket_collaborators'
+    id = db.Column(db.Integer, primary_key=True)
+    saved_basket_id = db.Column(db.Integer, db.ForeignKey('saved_baskets.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.String(20), default='pending') # pending, accepted, declined
+    role = db.Column(db.String(20), default='editor') # editor, viewer
+
+class Notification(db.Model):
+    __tablename__ = 'notifications'
+    id = db.Column(db.Integer, primary_key=True)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    basket_id = db.Column(db.Integer, db.ForeignKey('saved_baskets.id'), nullable=False)
+    message = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(20), default='unread') # unread, read
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 with app.app_context():
@@ -248,7 +323,6 @@ def refresh_tokens_sync():
 RETAILER_STOPWORDS = {'pnp', 'pick', 'pay', 'shoprite', 'checkers', 'woolworths', 'woolies', 'housebrand', 'ritebrand', 'simple', 'truth', 'the', 'and', 'fresh', 'superior'}
 
 def normalize_units(text: str) -> str:
-    """Standardizes unit expressions (e.g., 2000ml -> 2l, 1000g -> 1kg)."""
     text = text.lower()
     text = re.sub(r'(\d+)\s*(litre|litres|liter|liters|l\b)', r'\1l', text)
     text = re.sub(r'2000\s*ml', '2l', text)
@@ -260,19 +334,11 @@ def normalize_units(text: str) -> str:
     return text
 
 def extract_features(title: str):
-    """Cleans title, removes store names, and extracts standard size."""
     normalized = normalize_units(title)
-    
-    # Extract size pattern (e.g., 2l, 500g, 6x330ml)
     size_match = re.search(r'\b(\d+(?:\.\d+)?(?:kg|g|l|ml)|(?:\d+x\d+ml))\b', normalized)
     size = size_match.group(0) if size_match else ""
-    
-    # Remove non-alphanumeric except spaces
     cleaned = re.sub(r'[^a-z0-9\s]', ' ', normalized)
-    
-    # Remove retailer stopwords
     tokens = [w for w in cleaned.split() if w not in RETAILER_STOPWORDS and len(w) > 1]
-    
     return {
         'clean_text': " ".join(tokens),
         'tokens': set(tokens),
@@ -282,19 +348,13 @@ def extract_features(title: str):
 def calculate_match_score(target_title: str, candidate_title: str):
     target_feat = extract_features(target_title)
     candidate_feat = extract_features(candidate_title)
-    
-    # 1. Size Mismatch Penalty
     if target_feat['size'] and candidate_feat['size']:
         if target_feat['size'] != candidate_feat['size']:
-            return 0, False # Size mismatch cannot be an equivalent match
-            
-    # 2. Compute Token Similarity (order-agnostic)
+            return 0, False
     similarity = fuzz.token_set_ratio(
         target_feat['clean_text'], 
         candidate_feat['clean_text']
     )
-    
-    # 3. Determine Match Type
     is_exact = similarity >= 88 and target_feat['size'] == candidate_feat['size']
     return similarity, is_exact
 
@@ -314,22 +374,19 @@ def filter_and_score_competitors(original_name: str, scraped_results: list) -> l
         store_groups[store].append(item)
         
     final_results = []
-    
     for store, items in store_groups.items():
         best_match = None
         highest_score = 0
         best_is_exact = False
-        
         for item in items:
             item_name = item.get('name', '')
             score, is_exact = calculate_match_score(original_name, item_name)
-            
             if score > highest_score:
                 highest_score = score
                 best_match = item
                 best_is_exact = is_exact
 
-        if best_match and highest_score >= 65:  # Confidence Threshold
+        if best_match and highest_score >= 65:
             best_match['is_exact_match'] = best_is_exact
             best_match['isExact'] = best_is_exact
             best_match['score'] = highest_score
@@ -538,14 +595,12 @@ async def scrape_woolworths(query: str, page_size: int = 16):
             if res.status_code == 200:
                 data = res.json()
                 results = data.get('response', {}).get('results', [])
-                
                 extracted = []
                 for item in results:
                     item_data = item.get('data', {})
                     name = item_data.get('name') or item.get('value', '')
                     price = extract_woolworths_price(item_data)
                     image_url = extract_woolworths_image(item_data)
-                    
                     extracted.append({
                         'id': f"woolworths_{item_data.get('product_id') or item_data.get('id', '')}",
                         'name': name,
@@ -664,6 +719,16 @@ def get_categories():
 
     return jsonify(asyncio.run(fetch_live_categories()))
 
+def user_can_edit_basket(basket_id, user_id):
+    if not user_id: return False
+    basket = db.session.get(SavedBasket, basket_id)
+    if not basket: return False
+    if basket.user_id == user_id: return True
+    collab = SavedBasketCollaborator.query.filter_by(
+        saved_basket_id=basket_id, user_id=user_id, status='accepted'
+    ).first()
+    return collab is not None
+
 @app.route('/api/compare', methods=['GET'])
 def compare_product():
     query = request.args.get('q', '').strip()
@@ -709,7 +774,6 @@ async def internal_fetch_competitors(query: str):
 def batch_compare():
     data = request.json or {}
     queries = data.get('queries', [])
-    
     if not queries:
         return jsonify({})
 
@@ -719,10 +783,9 @@ def batch_compare():
         return dict(zip(queries, results))
         
     batch_results = asyncio.run(fetch_all_competitors())
-    
     return jsonify(batch_results)
 
-# --- Active Cart & Saved Basket Endpoints ---
+# --- Reviews, Active Cart & Saved Baskets ---
 
 @app.route('/api/reviews/<path:product_id>', methods=['GET'])
 def get_reviews(product_id):
@@ -737,28 +800,27 @@ def get_reviews(product_id):
 
 @app.route('/api/reviews/<path:product_id>', methods=['POST'])
 def add_review(product_id):
-    if 'username' not in session:
+    if 'username' not in session or 'user_id' not in session:
         return jsonify({'error': 'Authentication required'}), 401
 
     data = request.json or {}
     rating = int(data.get('rating', 5))
     comment = data.get('comment', '').strip()
-    
     author = session.get('username')
+    user_id = session.get('user_id')
     
     if not comment:
         return jsonify({'error': 'Comment is required'}), 400
         
     new_review = Review(
         product_id=product_id, 
+        user_id=user_id,
         author_name=author, 
         rating=rating, 
         comment=comment
     )
-    
     db.session.add(new_review)
     db.session.commit()
-    
     return jsonify({'success': True})
 
 @app.route('/api/db/active-cart', methods=['GET', 'POST'])
@@ -788,36 +850,35 @@ def handle_active_cart():
         db.session.commit()
         return jsonify({'authenticated': True, 'success': True})
 
-@app.route('/api/db/saved-baskets', methods=['GET'])
-def get_db_saved_baskets():
-    user_id = session.get('user_id')
-    if user_id:
-        baskets = SavedBasket.query.filter_by(user_id=user_id).order_by(SavedBasket.created_at.desc()).all()
-    else:
-        baskets = SavedBasket.query.filter_by(user_id=None).order_by(SavedBasket.created_at.desc()).all()
-        
-    output = []
-    for b in baskets:
-        items_list = [{
-            'id': bi.product.id, 'name': bi.product.name, 'store': bi.product.store,
-            'price': bi.price if bi.price is not None else bi.product.price, 
-            'formattedPrice': bi.product.formatted_price,
-            'imageUrl': bi.product.image_url, 'quantity': bi.quantity,
-            'competitors': json.loads(bi.competitor_prices) if bi.competitor_prices else []
-        } for bi in b.items if bi.product]
-        output.append({'id': b.id, 'name': b.name, 'date': b.created_at.strftime('%Y-%m-%d'), 'items': items_list})
-    return jsonify(output)
-
 @app.route('/api/db/save-basket', methods=['POST'])
 def save_basket_to_db():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Authentication required. Please log in.'}), 401
+
     data = request.json or {}
-    basket_name, items = data.get('name', 'My Saved Basket'), data.get('items', [])
-    if not items: return jsonify({'error': 'No items in basket'}), 400
+    basket_id = data.get('basket_id')  # Optional: present if updating an existing list
+    basket_name = data.get('name', 'My Saved Basket')
+    items = data.get('items', [])
+    if not items: 
+        return jsonify({'error': 'No items in basket'}), 400
 
     try:
-        new_basket = SavedBasket(name=basket_name, user_id=session.get('user_id'))
-        db.session.add(new_basket)
-        db.session.flush()
+        if basket_id:
+            basket = db.session.get(SavedBasket, basket_id)
+            if not basket:
+                return jsonify({'error': 'Basket not found'}), 404
+            if not user_can_edit_basket(basket_id, user_id):
+                return jsonify({'error': 'Unauthorized'}), 403
+            
+            basket.name = basket_name
+            BasketItem.query.filter_by(basket_id=basket.id).delete()
+            target_basket_id = basket.id
+        else:
+            basket = SavedBasket(name=basket_name, user_id=user_id)
+            db.session.add(basket)
+            db.session.flush()
+            target_basket_id = basket.id
 
         async def get_all_competitors():
             tasks = [internal_fetch_competitors(item['name']) for item in items]
@@ -836,18 +897,41 @@ def save_basket_to_db():
                 db.session.add(product)
                 
             comps = [c for c in competitors_lists[idx] if c['id'] != item['id']]
-
             snapshot_price = float(item['price'])
             db.session.add(BasketItem(
-                basket_id=new_basket.id, 
+                basket_id=target_basket_id, 
                 product_id=item['id'], 
                 quantity=item.get('quantity', 1),
                 price=snapshot_price,
                 competitor_prices=json.dumps(comps)
             ))
 
+        # Notify collaborators if this is an active collaborative list
+        if basket.is_collaborative:
+            collabs = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket.id, status='accepted').all()
+            sender_name = session.get('username', 'Someone')
+            
+            # Notify all accepted collaborators except the sender
+            for c in collabs:
+                if c.user_id != user_id:
+                    db.session.add(Notification(
+                        recipient_id=c.user_id,
+                        sender_id=user_id,
+                        basket_id=basket.id,
+                        message=f"{sender_name} updated the collaborative list '{basket.name}'."
+                    ))
+            
+            # Notify the owner if someone else edited it
+            if basket.user_id != user_id:
+                db.session.add(Notification(
+                    recipient_id=basket.user_id,
+                    sender_id=user_id,
+                    basket_id=basket.id,
+                    message=f"{sender_name} updated your collaborative list '{basket.name}'."
+                ))
+
         db.session.commit()
-        return jsonify({'success': True, 'basket_id': new_basket.id})
+        return jsonify({'success': True, 'basket_id': target_basket_id})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -863,7 +947,255 @@ def delete_db_basket(basket_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/search', methods=['GET'])
+def search_system_users():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify([])
+    users = User.query.filter(User.username.ilike(f'%{query}%'), User.id != session['user_id']).limit(5).all()
+    return jsonify([{'id': u.id, 'username': u.username} for u in users])
+
+@app.route('/api/saved-baskets/<int:basket_id>/collaborators', methods=['GET'])
+def get_collaborators(basket_id):
+    collabs = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket_id).all()
+    output = []
+    for c in collabs:
+        u = db.session.get(User, c.user_id)
+        if u:
+            output.append({
+                'id': u.id, 'username': u.username, 'status': c.status, 'role': c.role
+            })
+    return jsonify(output)
+
+@app.route('/api/saved-baskets/<int:basket_id>/invite', methods=['POST'])
+def invite_collaborator(basket_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
     
+    basket = db.session.get(SavedBasket, basket_id)
+    if not basket:
+        return jsonify({'error': 'List not found'}), 404
+
+    data = request.json or {}
+    raw_user_id = data.get('user_id')
+    if not raw_user_id:
+        return jsonify({'error': 'Target user ID is required'}), 400
+        
+    target_user_id = int(raw_user_id)
+    if target_user_id == session['user_id']:
+        return jsonify({'error': 'You cannot invite yourself'}), 400
+    
+    # Automatically duplicate personal snapshot into a collaborative workspace copy
+    target_basket = basket
+    if not basket.is_collaborative:
+        collab_basket = SavedBasket(
+            user_id=basket.user_id,
+            name=f"{basket.name} (Collab)",
+            is_collaborative=True
+        )
+        db.session.add(collab_basket)
+        db.session.flush()
+        
+        for item in basket.items:
+            new_item = BasketItem(
+                basket_id=collab_basket.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                price=item.price,
+                competitor_prices=item.competitor_prices
+            )
+            db.session.add(new_item)
+        target_basket = collab_basket
+
+    existing = SavedBasketCollaborator.query.filter_by(saved_basket_id=target_basket.id, user_id=target_user_id).first()
+    if existing:
+        return jsonify({'error': 'User is already invited or a member'}), 400
+
+    collab = SavedBasketCollaborator(saved_basket_id=target_basket.id, user_id=target_user_id, status='pending')
+    db.session.add(collab)
+
+    sender_name = session.get('username', 'Someone')
+    notif = Notification(
+        recipient_id=target_user_id,
+        sender_id=session['user_id'],
+        basket_id=target_basket.id,
+        message=f"{sender_name} invited you to collaborate on list: '{target_basket.name}'"
+    )
+    db.session.add(notif)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'basket_id': target_basket.id})
+
+@app.route('/api/notifications', methods=['GET'])
+def get_user_notifications():
+    if 'user_id' not in session:
+        return jsonify([])
+    notifs = Notification.query.filter_by(recipient_id=session['user_id']).order_by(Notification.created_at.desc()).all()
+    return jsonify([{
+        'id': n.id, 'message': n.message, 'basket_id': n.basket_id,
+        'sender_id': n.sender_id, 'status': n.status,
+        'date': n.created_at.strftime('%Y-%m-%d %H:%M')
+    } for n in notifs])
+
+@app.route('/api/notifications/count', methods=['GET'])
+def get_unread_notifications_count():
+    if 'user_id' not in session:
+        return jsonify({'count': 0})
+    count = Notification.query.filter_by(recipient_id=session['user_id'], status='unread').count()
+    return jsonify({'count': count})
+
+@app.route('/api/notifications/<int:notif_id>/respond', methods=['POST'])
+def respond_notification(notif_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    notif = db.session.get(Notification, notif_id)
+    if not notif or notif.recipient_id != session['user_id']:
+        return jsonify({'error': 'Notification not found'}), 404
+
+    data = request.json or {}
+    action = data.get('action')
+    notif.status = 'read'
+
+    collab = SavedBasketCollaborator.query.filter_by(saved_basket_id=notif.basket_id, user_id=session['user_id']).first()
+    if action == 'accept':
+        if collab: collab.status = 'accepted'
+        basket = db.session.get(SavedBasket, notif.basket_id)
+        if basket:
+            owner_notif = Notification(
+                recipient_id=notif.sender_id,
+                sender_id=session['user_id'],
+                basket_id=basket.id,
+                message=f"{session.get('username')} accepted your invite for '{basket.name}'!"
+            )
+            db.session.add(owner_notif)
+    else:
+        if collab: db.session.delete(collab)
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/shared/basket/<token>', methods=['GET'])
+def public_shared_basket(token):
+    basket = SavedBasket.query.filter_by(share_token=token).first_or_404()
+    return render_template('public_shared_basket.html', basket=basket)
+
+@app.route('/api/db/saved-baskets', methods=['GET'])
+def get_db_saved_baskets():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify([])
+
+    # Personal snapshots (non-collaborative)
+    owned_personal = SavedBasket.query.filter_by(user_id=user_id, is_collaborative=False).order_by(SavedBasket.created_at.desc()).all()
+    
+    # Collaborative lists (owned workspaces + shared with user)
+    owned_collab = SavedBasket.query.filter_by(user_id=user_id, is_collaborative=True).all()
+    collabs = SavedBasketCollaborator.query.filter_by(user_id=user_id, status='accepted').all()
+    shared_basket_ids = [c.saved_basket_id for c in collabs]
+    shared_collab = SavedBasket.query.filter(SavedBasket.id.in_(shared_basket_ids)).all() if shared_basket_ids else []
+    
+    all_collabs = list(set(owned_collab + shared_collab))
+    all_collabs.sort(key=lambda x: x.created_at, reverse=True)
+
+    output = []
+
+    for b in owned_personal:
+        items_list = [{'id': bi.product.id, 'name': bi.product.name, 'store': bi.product.store, 'price': bi.price or bi.product.price, 'formattedPrice': bi.product.formatted_price, 'imageUrl': bi.product.image_url, 'quantity': bi.quantity} for bi in b.items if bi.product]
+        output.append({'id': b.id, 'name': b.name, 'date': b.created_at.strftime('%Y-%m-%d'), 'items': items_list, 'is_shared': False, 'is_collab': False})
+
+    for b in all_collabs:
+        inviter_name = b.owner.username if b.owner else 'Someone'
+        items_list = [{'id': bi.product.id, 'name': bi.product.name, 'store': bi.product.store, 'price': bi.price or bi.product.price, 'formattedPrice': bi.product.formatted_price, 'imageUrl': bi.product.image_url, 'quantity': bi.quantity} for bi in b.items if bi.product]
+        output.append({
+            'id': b.id, 'name': b.name, 'date': b.created_at.strftime('%Y-%m-%d'), 
+            'items': items_list, 'is_shared': (b.user_id != user_id), 'is_collab': True,
+            'inviter_name': inviter_name
+        })
+
+    return jsonify(output)
+
+@app.route('/api/notifications/<int:notif_id>/read', methods=['POST'])
+def mark_notification_read(notif_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    notif = db.session.get(Notification, notif_id)
+    if not notif or notif.recipient_id != session['user_id']:
+        return jsonify({'error': 'Notification not found'}), 404
+
+    notif.status = 'read'
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/notifications/mark-all-read', methods=['POST'])
+def mark_all_notifications_as_read():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    Notification.query.filter_by(
+        recipient_id=session['user_id'], 
+        status='unread'
+    ).update({'status': 'read'})
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/db/saved-baskets/<int:basket_id>/items', methods=['POST'])
+def add_item_to_saved_basket(basket_id):
+    user_id = session.get('user_id')
+    if not user_can_edit_basket(basket_id, user_id):
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    data = request.json or {}
+    product_id = data.get('id')
+    quantity = int(data.get('quantity', 1))
+    
+    product = db.session.get(Product, product_id)
+    if not product:
+        product = Product(
+            id=product_id, name=data['name'], store=data['store'],
+            price=float(data['price']), formatted_price=data.get('formattedPrice', f"R {float(data['price']):.2f}"),
+            image_url=data.get('imageUrl', '')
+        )
+        db.session.add(product)
+        db.session.commit()
+        
+    existing_item = BasketItem.query.filter_by(basket_id=basket_id, product_id=product_id).first()
+    if existing_item:
+        existing_item.quantity += quantity
+    else:
+        new_item = BasketItem(
+            basket_id=basket_id, product_id=product_id, 
+            quantity=quantity, price=product.price
+        )
+        db.session.add(new_item)
+        
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/db/saved-baskets/<int:basket_id>/items/<path:product_id>', methods=['PATCH', 'DELETE'])
+def modify_saved_basket_item(basket_id, product_id):
+    user_id = session.get('user_id')
+    if not user_can_edit_basket(basket_id, user_id):
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    item = BasketItem.query.filter_by(basket_id=basket_id, product_id=product_id).first_or_404()
+    
+    if request.method == 'DELETE':
+        db.session.delete(item)
+    elif request.method == 'PATCH':
+        data = request.json or {}
+        change = int(data.get('change', 0))
+        item.quantity += change
+        if item.quantity <= 0:
+            db.session.delete(item)
+            
+    db.session.commit()
+    return jsonify({'success': True})
+
 # ==========================================
 # HTML FRONTEND ROUTES
 # ==========================================
@@ -876,6 +1208,12 @@ def home():
             user_pref_stores = [s.strip() for s in user_pref.preferred_store.split(',')]
             
     return render_template('index.html', user_pref_stores=user_pref_stores)
+
+@app.route('/collaborative')
+def collaborative_lists():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('collaborative.html')
 
 @app.route('/api/popular', methods=['GET'])
 def api_popular_products():
@@ -891,14 +1229,10 @@ def api_popular_products():
         products = Product.query.order_by(db.func.random()).limit(20).all()
         
     output = [{
-        'id': p.id,
-        'name': p.name,
-        'store': p.store,
-        'price': p.price,
-        'formattedPrice': p.formatted_price,
+        'id': p.id, 'name': p.name, 'store': p.store,
+        'price': p.price, 'formattedPrice': p.formatted_price,
         'imageUrl': p.image_url
     } for p in products]
-    
     return jsonify(output)
 
 @app.route('/search')
@@ -921,13 +1255,31 @@ def saved_baskets():
 @app.route('/saved/<int:basket_id>')
 def saved_basket_detail(basket_id):
     basket = db.get_or_404(SavedBasket, basket_id)
-    return render_template('saved_basket_detail.html', basket=basket)
+    if not basket.share_token:
+        basket.share_token = uuid.uuid4().hex
+        db.session.commit()
+        
+    user_id = session.get('user_id')
+    requires_acceptance = False
+    
+    if user_id and basket.user_id != user_id:
+        collab = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket_id, user_id=user_id).first()
+        if not collab or collab.status != 'accepted':
+            requires_acceptance = True
+            
+    return render_template('saved_basket_detail.html', basket=basket, requires_acceptance=requires_acceptance)
+
+@app.route('/notifications', endpoint='notifications')
+@app.route('/notifications-page', endpoint='notifications_page')
+def notifications():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('notifications.html')
 
 @app.route('/account')
 def account():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-        
     user = db.session.get(User, session['user_id'])
     user_pref = UserPreference.query.filter_by(user_id=user.id).first()
     return render_template('account.html', user=user, user_pref=user_pref)
@@ -943,8 +1295,7 @@ def signup():
             return render_template('signup.html', error="Email already exists.")
             
         new_user = User(
-            username=username, 
-            email=email, 
+            username=username, email=email, 
             password_hash=generate_password_hash(password)
         )
         db.session.add(new_user)
@@ -960,7 +1311,6 @@ def signup():
             window.location.href = '{next_url}';
         </script>
         """
-        
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -968,11 +1318,9 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        
         user = User.query.filter_by(email=email).first()
         
-        id_valid = user and check_password_hash(user.password_hash, password)
-        if id_valid:
+        if user and check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
             session['username'] = user.username
             
@@ -986,7 +1334,6 @@ def login():
             """
         else:
             return render_template('login.html', error="Invalid email or password.")
-            
     return render_template('login.html')
 
 @app.route('/logout')
@@ -1005,7 +1352,6 @@ def onboarding():
         return redirect(url_for('login'))
         
     user_pref = UserPreference.query.filter_by(user_id=session['user_id']).first()
-    
     if request.method == 'POST':
         stores = request.form.getlist('preferred_stores')
         stores_str = ",".join(stores) if stores else "Checkers"
@@ -1025,7 +1371,6 @@ def onboarding():
 # ==========================================
 if __name__ == '__main__':
     init_cache_db()
-    
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
         scheduler.add_job(

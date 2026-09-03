@@ -27,7 +27,9 @@ const categoryKeywords = {
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     loadActiveBasketFromStorage();
+    updateNotificationBadge();
     initLogoutInterceptor();
+    checkUserNotifications();
 
     if (document.getElementById('unified-bottom-grid')) {
         initLandingPage();
@@ -41,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSavedBasketsList();
     } else if (document.getElementById('detail-saved-breakdown')) {
         initSavedBasketDetailPage();
+    } else if (window.location.pathname.includes('/notifications') || document.getElementById('notifications-list-container') || document.getElementById('notifications-container') || document.getElementById('notifications-list')) {
+        initNotificationsPage();
     }
 });
 
@@ -136,6 +140,28 @@ function switchBasketTab(tabName) {
         contentSbs.classList.remove('hidden');
         contentTotals.classList.add('hidden');
         setTimeout(executeSideBySide, 0);
+    }
+}
+
+async function updateNotificationBadge() {
+    try {
+        const res = await fetch(`${API}/api/notifications/count`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        const badges = document.querySelectorAll('.notification-badge');
+        badges.forEach(badge => {
+            if (data.count > 0) {
+                badge.textContent = data.count > 99 ? '99+' : data.count;
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+            } else {
+                badge.classList.add('hidden');
+                badge.classList.remove('flex');
+            }
+        });
+    } catch (e) {
+        console.error('Badge update failed', e);
     }
 }
 
@@ -462,7 +488,6 @@ async function initProductDetailPage() {
     detailComparisonLoading.classList.remove('hidden');
     detailComparisonGrid.innerHTML = '';
     
-    // NEW: Fetch Reviews for this product
     fetchProductReviews(p.id);
 
     try {
@@ -816,7 +841,6 @@ function executeSideBySide() {
 
     if (!container || !currentStoreData || !selectA || !selectB) return;
     
-    // Auto-select a different Store B if they are identical on first load
     if (selectA.selectedIndex === selectB.selectedIndex && selectB.options.length > 1) {
         selectB.selectedIndex = selectA.selectedIndex === 0 ? 1 : 0;
     }
@@ -952,11 +976,18 @@ async function renderSavedBasketsList() {
             const overflow = sb.items.length - 4;
             const totalEst = sb.items.reduce((a, c) => a + (c.price * (c.quantity || 1)), 0);
 
+            const sharedBadge = sb.is_shared 
+                ? `<span class="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 ml-2" title="Shared by ${sb.inviter_name}">
+                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                     Shared by ${sb.inviter_name}
+                   </span>` 
+                : '';
+
             return `
                 <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
                     <div>
                         <div class="flex justify-between items-start mb-1">
-                            <h3 class="font-black text-gray-900 dark:text-white text-base sm:text-lg break-words whitespace-normal pr-2 tracking-tight">${sb.name}</h3>
+                            <h3 class="font-black text-gray-900 dark:text-white text-base sm:text-lg flex flex-wrap items-center gap-2 pr-2 tracking-tight">${sb.name} ${sharedBadge}</h3>
                             <button onclick="deleteSavedBasket(event, ${sb.id})" class="text-gray-300 hover:text-red-600 font-black text-sm cursor-pointer p-1 -mt-1 -mr-1 transition" title="Delete Saved Basket">✕</button>
                         </div>
                         <p class="text-[11px] sm:text-xs font-semibold text-gray-400 mb-3">Saved on ${sb.date} &bull; ${sb.items.length} item(s)</p>
@@ -1045,7 +1076,7 @@ function renderSavedBasketComparison(items, containerId) {
     });
 
     storeData.sort((a, b) => a.total - b.total);
-    currentStoreData = storeData; // Save globally for the side-by-side view
+    currentStoreData = storeData;
 
     const mainListHtml = storeData.map((s, index) => {
         const isWinner = index === 0;
@@ -1126,6 +1157,286 @@ async function initSavedBasketDetailPage() {
     } catch (e) {
         breakdownContainer.innerHTML = `<p class="text-xs text-red-500 p-4 text-center">JSON Parse Error: ${e.message}</p>`;
     }
+
+    renderCollaboratorTrigger();
+}
+
+async function renderCollaboratorTrigger() {
+    const container = document.getElementById('collaborator-trigger-container');
+    if (!container || !currentInspectedSavedBasket) return;
+
+    try {
+        const res = await fetch(`${API}/api/saved-baskets/${currentInspectedSavedBasket.id}/collaborators`);
+        const members = await res.json();
+
+        if (!members || members.length === 0) {
+            container.innerHTML = `
+                <button onclick="openCollabModal()" class="w-10 h-10 bg-brand-dark dark:bg-emerald-600 text-white rounded-full flex items-center justify-center font-black shadow-sm hover:scale-105 transition cursor-pointer relative z-10" title="Add Collaborators">+</button>
+            `;
+        } else {
+            const acceptedMembers = members.filter(m => m.status === 'accepted');
+            container.innerHTML = `
+                <button onclick="openCollabModal()" class="flex items-center -space-x-2 overflow-hidden p-1 bg-gray-50 dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-700 cursor-pointer hover:scale-105 transition relative z-10" title="Manage Collaborators">
+                    ${acceptedMembers.slice(0, 3).map(m => `
+                        <span class="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-900 bg-emerald-600 text-white text-xs font-black flex items-center justify-center">${m.username.charAt(0).toUpperCase()}</span>
+                    `).join('')}
+                    <span class="inline-block h-8 w-8 rounded-full ring-2 ring-white dark:ring-gray-900 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-[10px] font-black flex items-center justify-center">+</span>
+                </button>
+            `;
+        }
+    } catch (e) {
+        container.innerHTML = `
+            <button onclick="openCollabModal()" class="w-10 h-10 bg-brand-dark dark:bg-emerald-600 text-white rounded-full flex items-center justify-center font-black shadow-sm hover:scale-105 transition cursor-pointer relative z-10" title="Add Collaborators">+</button>
+        `;
+    }
+}
+
+function openCollabModal() {
+    const modal = document.getElementById('collaborator-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        loadCollaboratorsList();
+    }
+}
+
+function closeCollabModal() {
+    const modal = document.getElementById('collaborator-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function checkUserNotifications() {
+    try {
+        const res = await fetch(`${API}/api/notifications`);
+        if (!res.ok) return;
+        const notifications = await res.json();
+
+        if (notifications.length > 0) {
+            showNotificationBanner(notifications);
+        }
+    } catch (e) {
+        console.error("Failed to fetch notifications", e);
+    }
+}
+
+function showNotificationBanner(notifications) {
+    const unread = notifications.filter(n => n.status === 'unread');
+    if (unread.length === 0) return;
+
+    let banner = document.getElementById('notification-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'notification-banner';
+        banner.className = 'fixed bottom-4 right-4 z-50 max-w-sm w-full space-y-2 pointer-events-none';
+        document.body.appendChild(banner);
+    }
+
+    const latest = unread[0];
+    const targetUrl = latest.basket_id ? `/saved/${latest.basket_id}` : '/notifications';
+
+    banner.innerHTML = `
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 shadow-xl flex items-center justify-between space-x-3 pointer-events-auto animate-slideUp">
+            <div class="space-y-1">
+                <p class="text-xs font-bold text-gray-900 dark:text-white leading-snug">${latest.message}</p>
+                <span class="text-[10px] text-gray-400 font-semibold">${latest.date || ''}</span>
+            </div>
+            <div class="flex items-center space-x-2 shrink-0">
+                <a href="${targetUrl}" class="bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold py-1.5 px-3 rounded-xl text-xs transition cursor-pointer">Open</a>
+                <button onclick="closeNotificationBanner()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 font-bold text-sm cursor-pointer" title="Close">✕</button>
+            </div>
+        </div>
+    `;
+}
+
+function closeNotificationBanner() {
+    const banner = document.getElementById('notification-banner');
+    if (banner) banner.remove();
+}
+
+async function markAllNotificationsAsRead() {
+    try {
+        const res = await fetch(`${API}/api/notifications/mark-all-read`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (res.ok) {
+            showToast('All notifications marked as read.');
+            updateNotificationBadge();
+            initNotificationsPage();
+        } else {
+            showToast('Failed to update notifications.');
+        }
+    } catch (e) {
+        showToast('Connection error.');
+    }
+}
+
+async function initNotificationsPage() {
+    const container = document.getElementById('notifications-list-container') || 
+                      document.getElementById('notifications-container') || 
+                      document.getElementById('notifications-list') ||
+                      document.querySelector('.notifications-list');
+    
+    if (!container) return;
+
+    try {
+        const res = await fetch(`${API}/api/notifications`);
+        if (!res.ok) {
+            container.innerHTML = `<p class="text-sm font-medium text-red-400 text-center py-12">Failed to load notifications.</p>`;
+            return;
+        }
+        const notifications = await res.json();
+
+        if (!notifications || notifications.length === 0) {
+            container.innerHTML = `<p class="text-sm font-medium text-gray-400 text-center py-12">No notifications found.</p>`;
+            return;
+        }
+
+        const hasUnread = notifications.some(n => n.status === 'unread');
+        const headerHtml = hasUnread ? `
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-800 px-1">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Unread & Recent</span>
+                <button onclick="markAllNotificationsAsRead()" class="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer">Mark all as read</button>
+            </div>
+        ` : '';
+
+        const listHtml = notifications.map(n => {
+            const isInvite = n.message.includes('invited you');
+            const targetUrl = n.basket_id ? `/saved/${n.basket_id}` : '#';
+            return `
+                <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <p class="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">${n.message}</p>
+                        <span class="text-[10px] text-gray-400 font-semibold">${n.date}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 shrink-0 w-full sm:w-auto">
+                        ${n.basket_id ? `<a href="${targetUrl}" class="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 font-bold py-2 px-3 rounded-xl text-xs transition cursor-pointer text-center">Open List</a>` : ''}
+                        ${isInvite && n.status === 'unread' ? `
+                            <button onclick="respondToNotification(${n.id}, 'accept')" class="bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold py-2 px-4 rounded-xl text-xs transition cursor-pointer">Accept</button>
+                            <button onclick="respondToNotification(${n.id}, 'decline')" class="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 font-bold py-2 px-4 rounded-xl text-xs transition cursor-pointer">Decline</button>
+                        ` : `
+                            <span class="text-[10px] font-bold px-2.5 py-1 rounded-full ${n.status === 'read' ? 'bg-gray-100 dark:bg-gray-800 text-gray-500' : 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600'}">${n.status.toUpperCase()}</span>
+                        `}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = headerHtml + `<div class="space-y-4">${listHtml}</div>`;
+    } catch (e) {
+        container.innerHTML = `<p class="text-xs text-red-400 text-center py-8">Failed to load notifications.</p>`;
+    }
+}
+
+async function respondToNotification(notifId, action) {
+    try {
+        const res = await fetch(`${API}/api/notifications/${notifId}/respond`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action })
+        });
+        
+        if (res.ok) {
+            showToast(action === 'accept' ? 'Invitation accepted!' : 'Invitation declined.');
+            const banner = document.getElementById('notification-banner');
+            if (banner) banner.remove();
+            
+            if (typeof renderCollaboratorTrigger === 'function') {
+                renderCollaboratorTrigger();
+            }
+            updateNotificationBadge();
+            initNotificationsPage();
+        } else {
+            showToast('Failed to respond to notification.');
+        }
+    } catch (e) {
+        showToast('Connection error.');
+    }
+}
+
+async function searchSystemUsers(query) {
+    const resultsContainer = document.getElementById('user-search-results');
+    if (!resultsContainer) return;
+    
+    if (!query.trim()) {
+        resultsContainer.innerHTML = '';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API}/api/users/search?q=${encodeURIComponent(query)}`);
+        const users = await res.json();
+
+        if (users.length === 0) {
+            resultsContainer.innerHTML = `<p class="text-xs text-gray-400 p-2">No users found.</p>`;
+            return;
+        }
+
+        resultsContainer.innerHTML = users.map(u => `
+            <div class="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                <span class="text-xs font-bold text-gray-900 dark:text-white">${u.username}</span>
+                <button onclick="inviteUser(${u.id})" class="px-3 py-1 bg-brand-dark dark:bg-emerald-600 text-white font-bold text-[10px] rounded-lg hover:bg-black transition cursor-pointer">Invite</button>
+            </div>
+        `).join('');
+    } catch (e) {
+        resultsContainer.innerHTML = `<p class="text-xs text-red-400 p-2">Search failed.</p>`;
+    }
+}
+
+async function inviteUser(userId) {
+    if (!currentInspectedSavedBasket) return;
+    try {
+        const res = await fetch(`${API}/api/saved-baskets/${currentInspectedSavedBasket.id}/invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Invitation sent successfully!');
+            document.getElementById('user-search-input').value = '';
+            document.getElementById('user-search-results').innerHTML = '';
+            loadCollaboratorsList();
+            renderCollaboratorTrigger();
+        } else {
+            showToast(data.error || 'Failed to send invitation.');
+        }
+    } catch (e) {
+        showToast('Connection error.');
+    }
+}
+
+async function loadCollaboratorsList() {
+    const container = document.getElementById('collaborators-list-container');
+    if (!container || !currentInspectedSavedBasket) return;
+
+    try {
+        const res = await fetch(`${API}/api/saved-baskets/${currentInspectedSavedBasket.id}/collaborators`);
+        const members = await res.json();
+
+        if (members.length === 0) {
+            container.innerHTML = `<p class="text-xs text-gray-400">No collaborators added yet.</p>`;
+            return;
+        }
+
+        container.innerHTML = members.map(m => `
+            <div class="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                <span class="text-xs font-bold text-gray-900 dark:text-white">${m.username}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${m.status === 'accepted' ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600' : 'bg-amber-100 dark:bg-amber-950/50 text-amber-600'}">${m.status}</span>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = `<p class="text-xs text-red-400">Failed to load collaborators.</p>`;
+    }
+}
+
+function copyPublicShareLink() {
+    if (!currentInspectedSavedBasket || !currentInspectedSavedBasket.share_token) {
+        showToast('Share link not available.');
+        return;
+    }
+    const publicUrl = `${window.location.origin}/shared/basket/${currentInspectedSavedBasket.share_token}`;
+    navigator.clipboard.writeText(publicUrl);
+    showToast('Public view-only link copied to clipboard!');
 }
 
 async function deleteSavedBasket(e, id) {
@@ -1246,5 +1557,152 @@ async function submitReview(e) {
         }
     } catch (err) {
         showToast('Connection error while submitting review.');
+    }
+}
+
+async function updateCollabItemQuantity(basketId, productId, change) {
+    try {
+        const res = await fetch(`${API}/api/db/saved-baskets/${basketId}/items/${productId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ change: change })
+        });
+        if (res.ok) {
+            reloadSavedBasketDetail(basketId);
+        } else {
+            showToast('Failed to update item quantity.');
+        }
+    } catch (e) {
+        showToast('Connection error.');
+    }
+}
+
+async function removeCollabItem(basketId, productId) {
+    try {
+        const res = await fetch(`${API}/api/db/saved-baskets/${basketId}/items/${productId}`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            showToast('Item removed from list.');
+            reloadSavedBasketDetail(basketId);
+        } else {
+            showToast('Failed to remove item.');
+        }
+    } catch (e) {
+        showToast('Connection error.');
+    }
+}
+
+async function reloadSavedBasketDetail(basketId) {
+    try {
+        const res = await fetch(`${API}/api/db/saved-baskets`);
+        const allBaskets = await res.json();
+        const target = allBaskets.find(b => b.id === basketId);
+        if (target) {
+            currentInspectedSavedBasket = target;
+            renderSavedBasketComparison(target.items, 'detail-saved-breakdown');
+        }
+    } catch (e) {}
+}
+
+function goToCollaborativeLists() {
+    window.location.href = '/collaborative';
+}
+
+async function pollNotifications() {
+    try {
+        const res = await fetch('/api/notifications/count');
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // Target all notification badge instances in nav/menus
+        const badges = document.querySelectorAll('.notification-badge');
+        badges.forEach(badge => {
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+            } else {
+                badge.classList.add('hidden');
+                badge.classList.remove('flex');
+            }
+        });
+    } catch (e) {
+        // Suppress network errors during background polling
+    }
+}
+
+// Poll every 30 seconds
+setInterval(pollNotifications, 15000);
+
+// Check immediately on page load
+document.addEventListener('DOMContentLoaded', pollNotifications);
+
+async function loadSavedBasketAsActive() {
+    const basketData = JSON.parse(document.getElementById('basket-data').textContent);
+    
+    if (basketData.id) {
+        localStorage.setItem('activeCollaborativeBasketId', basketData.id);
+        localStorage.setItem('activeCollaborativeBasketName', basketData.name);
+    }
+
+    try {
+        // Save items to the database active cart endpoint
+        const res = await fetch('/api/db/active-cart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: basketData.items })
+        });
+
+        if (res.ok) {
+            localStorage.setItem('smartBasket_active', JSON.stringify(basketData.items));
+            showToast('Loaded list into active cart!');
+            setTimeout(() => { window.location.href = '/basket'; }, 500);
+        } else {
+            showToast('Failed to load items to active cart.');
+        }
+    } catch (e) {
+        showToast('Connection error.');
+    }
+}
+
+async function saveActiveCartChanges() {
+    const activeItems = JSON.parse(localStorage.getItem('smartBasket_active') || '[]');
+    const collabBasketId = localStorage.getItem('activeCollaborativeBasketId');
+    const collabBasketName = localStorage.getItem('activeCollaborativeBasketName') || 'Collaborative Workspace';
+
+    if (!activeItems.length) {
+        showToast('Your cart is empty.');
+        return;
+    }
+
+    try {
+        const payload = {
+            name: collabBasketName,
+            items: activeItems
+        };
+        
+        // Include basket_id if editing an existing collaborative list
+        if (collabBasketId) {
+            payload.basket_id = parseInt(collabBasketId);
+        }
+
+        const res = await fetch('/api/db/save-basket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        if (res.ok && data.success) {
+            showToast('Changes saved and team notified!');
+            localStorage.removeItem('activeCollaborativeBasketId');
+            localStorage.removeItem('activeCollaborativeBasketName');
+            setTimeout(() => { window.location.href = `/saved/${data.basket_id}`; }, 800);
+        } else {
+            showToast(data.error || 'Failed to save changes.');
+        }
+    } catch (e) {
+        showToast('Connection error.');
     }
 }

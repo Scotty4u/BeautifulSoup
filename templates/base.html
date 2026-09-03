@@ -6,6 +6,15 @@
     <title>Smart Basket | Compare Grocery Prices</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛒</text></svg>">
     
+    <!-- INITIALIZE DARK MODE BEFORE PAGE RENDER -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -22,7 +31,6 @@
         }
     </script>
     <style>
-        
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -72,12 +80,13 @@
                 <div class="flex items-center space-x-4 sm:space-x-6 shrink-0 text-gray-600 dark:text-gray-300">
                     <button onclick="toggleMobileSearch()" class="md:hidden hover:text-brand-dark dark:hover:text-white transition p-1 cursor-pointer"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></button>
                     
-                    <!-- NOTIFICATIONS BUTTON RESTORED -->
-                    <button onclick="showToast('No new notifications')" class="hover:text-brand-dark dark:hover:text-white transition p-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 hidden sm:block cursor-pointer" title="Notifications">
+                    <!-- NOTIFICATIONS LINK -->
+                    <a href="{{ url_for('notifications') }}" class="relative hover:text-brand-dark dark:hover:text-white transition p-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 hidden sm:flex items-center justify-center cursor-pointer" title="Notifications">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                         </svg>
-                    </button>
+                        <span class="notification-badge absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold h-4 w-4 rounded-full items-center justify-center hidden">0</span>
+                    </a>
 
                     <a href="{{ url_for('account') }}" class="hover:text-brand-dark dark:hover:text-white transition hidden sm:block p-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" title="Account Settings">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,6 +158,10 @@
         <div class="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-4">
             <h3 class="text-xs font-black uppercase tracking-wider text-gray-400">Account & Lists</h3>
             <div class="flex flex-col space-y-3 font-semibold text-sm text-gray-700 dark:text-gray-300">
+                <a href="{{ url_for('notifications') }}" class="flex items-center space-x-3 py-1.5 hover:text-brand-dark dark:hover:text-white transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    <span>Notifications</span>
+                </a>
                 <a href="{{ url_for('saved_baskets') }}" class="flex items-center space-x-3 py-1.5 hover:text-brand-dark dark:hover:text-white transition">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                     <span>Saved Baskets</span>
