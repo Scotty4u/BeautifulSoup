@@ -1365,6 +1365,7 @@ def onboarding():
         return redirect(url_for('account'))
         
     return render_template('onboarding.html')
+#
 
 # ==========================================
 # APP STARTUP
@@ -1376,7 +1377,7 @@ if __name__ == '__main__':
         scheduler.add_job(
             func=refresh_tokens_sync, 
             trigger="interval", 
-            minutes=20, 
+            minutes=20,
             next_run_time=datetime.now()
         )
         scheduler.start()
