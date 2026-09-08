@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies and core libraries required by Playwright Chromium
+# Install system dependencies required by Playwright and build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libffi-dev \
@@ -45,14 +45,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install only the Chromium browser binary without triggering internal apt scripts
+# Install only the Chromium browser binary
 RUN playwright install chromium
 
-# Copy the rest of the application source code
+# Copy the rest of the application code
 COPY . .
 
-# Expose default web port
+# Expose web port
 EXPOSE 5000
 
-# Run production WSGI server via Gunicorn
-CMD gunicorn app:app --bind 0.0.0.0:${PORT:-5000} --workers 2 --threads 4 --timeout 120
+# Run production WSGI server via Gunicorn with 1 worker for SQLite safety
+CMD gunicorn app:app --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120
