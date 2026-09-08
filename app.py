@@ -28,7 +28,8 @@ CORS(app)
 # ==========================================
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
-db_path = 'smartbasket.db'
+# 🚨 FIX APPLIED HERE: Read from environment variable for persistent Docker volumes
+db_path = os.environ.get('DATABASE_PATH', 'smartbasket.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -988,46 +989,31 @@ def invite_collaborator(basket_id):
     if target_user_id == session['user_id']:
         return jsonify({'error': 'You cannot invite yourself'}), 400
     
-    # Automatically duplicate personal snapshot into a collaborative workspace copy
-    target_basket = basket
+    # -------------------------------------------------------------
+    # FIXED: Turn existing list into a collaborative list instead of duplicating
+    # -------------------------------------------------------------
     if not basket.is_collaborative:
-        collab_basket = SavedBasket(
-            user_id=basket.user_id,
-            name=f"{basket.name} (Collab)",
-            is_collaborative=True
-        )
-        db.session.add(collab_basket)
-        db.session.flush()
-        
-        for item in basket.items:
-            new_item = BasketItem(
-                basket_id=collab_basket.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                price=item.price,
-                competitor_prices=item.competitor_prices
-            )
-            db.session.add(new_item)
-        target_basket = collab_basket
+        basket.is_collaborative = True
+        db.session.add(basket)
 
-    existing = SavedBasketCollaborator.query.filter_by(saved_basket_id=target_basket.id, user_id=target_user_id).first()
+    existing = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket.id, user_id=target_user_id).first()
     if existing:
         return jsonify({'error': 'User is already invited or a member'}), 400
 
-    collab = SavedBasketCollaborator(saved_basket_id=target_basket.id, user_id=target_user_id, status='pending')
+    collab = SavedBasketCollaborator(saved_basket_id=basket.id, user_id=target_user_id, status='pending')
     db.session.add(collab)
 
     sender_name = session.get('username', 'Someone')
     notif = Notification(
         recipient_id=target_user_id,
         sender_id=session['user_id'],
-        basket_id=target_basket.id,
-        message=f"{sender_name} invited you to collaborate on list: '{target_basket.name}'"
+        basket_id=basket.id,
+        message=f"{sender_name} invited you to collaborate on list: '{basket.name}'"
     )
     db.session.add(notif)
     db.session.commit()
     
-    return jsonify({'success': True, 'basket_id': target_basket.id})
+    return jsonify({'success': True, 'basket_id': basket.id})
 
 @app.route('/api/notifications', methods=['GET'])
 def get_user_notifications():
@@ -1371,14 +1357,16 @@ def onboarding():
 # ==========================================
 if __name__ == '__main__':
     init_cache_db()
+
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
         scheduler.add_job(
-            func=refresh_tokens_sync, 
-            trigger="interval", 
-            minutes=20, 
+            func=refresh_tokens_sync,
+            trigger="interval",
+            minutes=20,
             next_run_time=datetime.now()
         )
         scheduler.start()
-        
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
