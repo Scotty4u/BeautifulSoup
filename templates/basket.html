@@ -3,32 +3,13 @@
 {% block content %}
 <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-grow">
     
-    <!-- DYNAMIC COLLABORATIVE SAVE CONTAINER -->
-    <div id="collab-cart-action-container" class="hidden mb-6 p-5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-500/30 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
-        <div>
-            <span class="inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 bg-emerald-600 text-white rounded-md mb-1">Collaborative Workspace Active</span>
-            <p id="collab-target-name" class="text-base sm:text-lg font-black text-gray-900 dark:text-white"></p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Editing this live cart will automatically update the shared list and notify team members.</p>
-        </div>
-        <button onclick="saveActiveCartChanges()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-5 py-3 rounded-xl transition shadow-sm cursor-pointer shrink-0">
-            Save Changes to List
-        </button>
-    </div>
-
     <!-- PAGE HEADER -->
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">Active Smart Basket</h1>
             <p class="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">Real-time store comparison and optimal cost breakdown.</p>
         </div>
-        <div class="flex items-center space-x-3">
-            <button onclick="openSaveBasketModal()" class="bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-                <span>Save List</span>
-            </button>
-        </div>
+        <!-- Header save button removed; integrated dynamically into the optimal strategy banner -->
     </div>
 
     <!-- OPTIMAL STRATEGY HERO BANNER -->
@@ -117,63 +98,4 @@
         </div>
     </div>
 </div>
-
-<script>
-    // Check on page load if an active collaborative list is loaded in the cart
-    document.addEventListener('DOMContentLoaded', () => {
-        const collabId = localStorage.getItem('activeCollaborativeBasketId');
-        const collabName = localStorage.getItem('activeCollaborativeBasketName');
-
-        if (collabId && collabName) {
-            const container = document.getElementById('collab-cart-action-container');
-            const nameEl = document.getElementById('collab-target-name');
-            
-            if (container && nameEl) {
-                nameEl.textContent = `Save changes to "${collabName}" list`;
-                container.classList.remove('hidden');
-                container.classList.add('flex');
-            }
-        }
-    });
-
-    async function saveActiveCartChanges() {
-        const activeItems = JSON.parse(localStorage.getItem('smartBasket_active') || '[]');
-        const collabBasketId = localStorage.getItem('activeCollaborativeBasketId');
-        const collabBasketName = localStorage.getItem('activeCollaborativeBasketName') || 'Collaborative Workspace';
-
-        if (!activeItems.length) {
-            showToast('Your cart is empty.');
-            return;
-        }
-
-        try {
-            const payload = {
-                name: collabBasketName,
-                items: activeItems
-            };
-            
-            if (collabBasketId) {
-                payload.basket_id = parseInt(collabBasketId);
-            }
-
-            const res = await fetch('/api/db/save-basket', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            
-            const data = await res.json();
-            if (res.ok && data.success) {
-                showToast('Changes saved and team notified!');
-                localStorage.removeItem('activeCollaborativeBasketId');
-                localStorage.removeItem('activeCollaborativeBasketName');
-                setTimeout(() => { window.location.href = `/saved/${data.basket_id}`; }, 800);
-            } else {
-                showToast(data.error || 'Failed to save changes.');
-            }
-        } catch (e) {
-            showToast('Connection error.');
-        }
-    }
-</script>
 {% endblock %}

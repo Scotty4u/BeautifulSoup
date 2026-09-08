@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initProductDetailPage();
     } else if (document.getElementById('basket-page-items-list')) {
         updateBasketPageUI();
-    } else if (document.getElementById('saved-baskets-list-container')) {
+    } else if (document.getElementById('saved-baskets-list-container') || document.getElementById('collab-baskets-list-container')) {
         renderSavedBasketsList();
     } else if (document.getElementById('detail-saved-breakdown')) {
         initSavedBasketDetailPage();
@@ -556,7 +556,21 @@ async function initProductDetailPage() {
 function updateBasketPageUI() {
     updateGlobalBasketCounter();
     const countEl = document.getElementById('basket-page-count');
-    if (countEl) countEl.textContent = basket.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    const saveListBtn = document.getElementById('header-save-list-btn');
+
+    const totalItems = basket.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    if (countEl) countEl.textContent = totalItems;
+
+    // Toggle header save button visibility based on whether items exist
+    if (saveListBtn) {
+        if (totalItems > 0) {
+            saveListBtn.classList.remove('hidden');
+            saveListBtn.classList.add('flex');
+        } else {
+            saveListBtn.classList.add('hidden');
+            saveListBtn.classList.remove('flex');
+        }
+    }
 
     const headerActionEl = document.querySelector('#basket-page-items-list').previousElementSibling;
     if (headerActionEl) {
@@ -574,7 +588,7 @@ function updateBasketPageUI() {
             headerActionEl.innerHTML = `
                 <div class="flex items-center space-x-3">
                     <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Items List</h2>
-                    <span class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full"><span id="basket-page-count">${basket.reduce((sum, item) => sum + (item.quantity || 1), 0)}</span> Items</span>
+                    <span class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full"><span id="basket-page-count">${totalItems}</span> Items</span>
                 </div>
                 <button onclick="clearEntireBasket()" class="p-2 bg-gray-50 dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-950/50 text-gray-400 hover:text-red-600 rounded-xl transition cursor-pointer" title="Delete Whole List">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -737,7 +751,7 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
     });
 
     storeData.sort((a, b) => a.total - b.total);
-    currentStoreData = storeData; // Save globally for the side-by-side view
+    currentStoreData = storeData;
 
     if (storeData.length === 0) return;
 
@@ -746,13 +760,47 @@ async function renderComparisonBreakdownAsync(items, containerId, heroId, isActi
     const maxSavings = maxStore.total - bestStore.total;
 
     if (heroSummary && maxSavings > 0 && storeData.length > 1) {
-        heroSummary.className = 'mb-6 sm:mb-8 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white rounded-3xl p-4 sm:p-6 shadow-sm flex items-center gap-4 transition-colors';
+        const collabId = localStorage.getItem('activeCollaborativeBasketId');
+        const collabName = localStorage.getItem('activeCollaborativeBasketName');
+        
+        let actionHtml = '';
+        if (collabId && collabName) {
+            actionHtml = `
+                <div class="flex items-center gap-3 shrink-0 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-gray-800 justify-between sm:justify-end">
+                    <div class="text-left sm:text-right">
+                        <span class="inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-emerald-600 text-white rounded-md mb-0.5">Collaborative Active</span>
+                        <p class="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[180px]" title="${collabName}">"${collabName}"</p>
+                    </div>
+                    <button onclick="saveActiveCartChanges()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer shrink-0">
+                        Save Changes
+                    </button>
+                </div>
+            `;
+        } else {
+            actionHtml = `
+                <div class="flex items-center gap-3 shrink-0 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-gray-800 justify-end">
+                    <button onclick="openSaveBasketModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl transition shadow-sm cursor-pointer shrink-0 flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        <span>Save List</span>
+                    </button>
+                </div>
+            `;
+        }
+
+        heroSummary.className = 'mb-6 sm:mb-8 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-white rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-colors';
         heroSummary.innerHTML = `
-            <div class="h-10 w-10 sm:h-12 sm:w-12 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center justify-center text-xl sm:text-2xl shrink-0 text-emerald-600 dark:text-emerald-400">💡</div>
-            <div>
-                <span class="text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Optimal Strategy</span>
-                <h3 class="text-base sm:text-xl font-black leading-tight mt-1">Shop at ${bestStore.name} to save R ${maxSavings.toFixed(2)}</h3>
+            <div class="flex items-center gap-4 min-w-0">
+                <div class="h-10 w-10 sm:h-12 sm:w-12 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center justify-center text-xl sm:text-2xl shrink-0 text-emerald-600 dark:text-emerald-400">💡</div>
+                <div class="min-w-0">
+                    <span class="text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Optimal Strategy</span>
+                    <h3 class="text-base sm:text-xl font-black leading-tight mt-1">Shop at ${bestStore.name} to save R ${maxSavings.toFixed(2)}</h3>
+                </div>
             </div>
+            ${actionHtml}
         `;
         heroSummary.classList.remove('hidden');
     }
@@ -921,10 +969,11 @@ function openSaveBasketModal() {
     }
     
     if (!isUserAuthenticated) {
-        showToast('Please log in to save baskets and view price snapshots.');
+        showToast('Please log in before you can save this list. Your cart has been saved.');
+        localStorage.setItem('smartBasket_guest_active', JSON.stringify(basket));
         setTimeout(() => {
             window.location.href = '/login';
-        }, 1200);
+        }, 1500);
         return;
     }
     
@@ -959,15 +1008,29 @@ async function confirmSaveBasket() {
 }
 
 async function renderSavedBasketsList() {
-    const container = document.getElementById('saved-baskets-list-container');
+    const savedContainer = document.getElementById('saved-baskets-list-container');
+    const collabContainer = document.getElementById('collab-baskets-list-container');
+    
+    // Determine which page we are rendering on
+    const container = savedContainer || collabContainer;
     if (!container) return;
 
     try {
         const res = await fetch(`${API}/api/db/saved-baskets`);
-        allSavedBaskets = await res.json();
+        let fetchedBaskets = await res.json();
+
+        // 💡 FILTER LOGIC: Separate Personal vs Collaborative
+        if (collabContainer) {
+            allSavedBaskets = fetchedBaskets.filter(b => b.is_collab === true);
+        } else {
+            allSavedBaskets = fetchedBaskets.filter(b => b.is_collab === false);
+        }
 
         if (!allSavedBaskets.length) {
-            container.innerHTML = `<p class="col-span-full text-center text-gray-400 font-medium py-12">No saved baskets found in database.</p>`;
+            const emptyMsg = collabContainer 
+                ? "You haven't joined or created any collaborative lists yet. Save a list and invite members to get started!" 
+                : "No personal saved baskets found.";
+            container.innerHTML = `<p class="col-span-full text-center text-gray-400 font-medium py-12">${emptyMsg}</p>`;
             return;
         }
 
@@ -976,19 +1039,23 @@ async function renderSavedBasketsList() {
             const overflow = sb.items.length - 4;
             const totalEst = sb.items.reduce((a, c) => a + (c.price * (c.quantity || 1)), 0);
 
-            const sharedBadge = sb.is_shared 
-                ? `<span class="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 ml-2" title="Shared by ${sb.inviter_name}">
-                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                     Shared by ${sb.inviter_name}
-                   </span>` 
-                : '';
+            // Assign badges based on ownership status
+            let badgeHtml = '';
+            if (sb.is_shared) {
+                badgeHtml = `<span class="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 ml-2" title="Shared by ${sb.inviter_name}">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    From ${sb.inviter_name}
+                </span>`;
+            } else if (sb.is_collab) {
+                badgeHtml = `<span class="inline-flex items-center gap-1 bg-brand-dark dark:bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm ml-2">Team Owner</span>`;
+            }
 
             return `
                 <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
                     <div>
                         <div class="flex justify-between items-start mb-1">
-                            <h3 class="font-black text-gray-900 dark:text-white text-base sm:text-lg flex flex-wrap items-center gap-2 pr-2 tracking-tight">${sb.name} ${sharedBadge}</h3>
-                            <button onclick="deleteSavedBasket(event, ${sb.id})" class="text-gray-300 hover:text-red-600 font-black text-sm cursor-pointer p-1 -mt-1 -mr-1 transition" title="Delete Saved Basket">✕</button>
+                            <h3 class="font-black text-gray-900 dark:text-white text-base sm:text-lg flex flex-wrap items-center gap-2 pr-2 tracking-tight">${sb.name} ${badgeHtml}</h3>
+                            <button onclick="deleteSavedBasket(event, ${sb.id})" class="text-gray-300 hover:text-red-600 font-black text-sm cursor-pointer p-1 -mt-1 -mr-1 transition" title="Delete List">✕</button>
                         </div>
                         <p class="text-[11px] sm:text-xs font-semibold text-gray-400 mb-3">Saved on ${sb.date} &bull; ${sb.items.length} item(s)</p>
                         <div class="flex items-center space-x-2 my-4">
@@ -997,7 +1064,7 @@ async function renderSavedBasketsList() {
                         </div>
                     </div>
                     <div class="pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                        <span class="text-sm font-black text-gray-900 dark:text-emerald-400">Snapshot Est. R ${totalEst.toFixed(2)}</span>
+                        <span class="text-sm font-black text-gray-900 dark:text-emerald-400">Est. R ${totalEst.toFixed(2)}</span>
                         <a href="/saved/${sb.id}" class="bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold text-[11px] sm:text-xs px-4 py-2 rounded-xl transition cursor-pointer shadow-sm text-center">View Details</a>
                     </div>
                 </div>
@@ -1459,14 +1526,6 @@ async function deleteSavedBasket(e, id) {
     }
 }
 
-function loadSavedBasketAsActive() {
-    if (!currentInspectedSavedBasket) return;
-    basket = currentInspectedSavedBasket.items.map(i => ({ ...i }));
-    updateGlobalBasketCounter();
-    showToast(`Loaded "${currentInspectedSavedBasket.name}" into active working basket!`);
-    setTimeout(() => window.location.href = '/basket', 1500);
-}
-
 function goBackFromSavedBasketDetail() {
     window.location.href = '/saved';
 }
@@ -1615,7 +1674,6 @@ async function pollNotifications() {
         if (!res.ok) return;
         const data = await res.json();
         
-        // Target all notification badge instances in nav/menus
         const badges = document.querySelectorAll('.notification-badge');
         badges.forEach(badge => {
             if (data.count > 0) {
@@ -1627,19 +1685,17 @@ async function pollNotifications() {
                 badge.classList.remove('flex');
             }
         });
-    } catch (e) {
-        // Suppress network errors during background polling
-    }
+    } catch (e) {}
 }
 
-// Poll every 30 seconds
 setInterval(pollNotifications, 15000);
 
-// Check immediately on page load
 document.addEventListener('DOMContentLoaded', pollNotifications);
 
 async function loadSavedBasketAsActive() {
-    const basketData = JSON.parse(document.getElementById('basket-data').textContent);
+    const dataEl = document.getElementById('basket-data');
+    if (!dataEl) return;
+    const basketData = JSON.parse(dataEl.textContent);
     
     if (basketData.id) {
         localStorage.setItem('activeCollaborativeBasketId', basketData.id);
@@ -1647,7 +1703,6 @@ async function loadSavedBasketAsActive() {
     }
 
     try {
-        // Save items to the database active cart endpoint
         const res = await fetch('/api/db/active-cart', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1667,11 +1722,11 @@ async function loadSavedBasketAsActive() {
 }
 
 async function saveActiveCartChanges() {
-    const activeItems = JSON.parse(localStorage.getItem('smartBasket_active') || '[]');
+    const activeItems = basket;
     const collabBasketId = localStorage.getItem('activeCollaborativeBasketId');
     const collabBasketName = localStorage.getItem('activeCollaborativeBasketName') || 'Collaborative Workspace';
 
-    if (!activeItems.length) {
+    if (!activeItems || activeItems.length === 0) {
         showToast('Your cart is empty.');
         return;
     }
@@ -1682,7 +1737,6 @@ async function saveActiveCartChanges() {
             items: activeItems
         };
         
-        // Include basket_id if editing an existing collaborative list
         if (collabBasketId) {
             payload.basket_id = parseInt(collabBasketId);
         }

@@ -2,228 +2,36 @@
 
 {% block content %}
 <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow space-y-6">
-    <!-- HEADER SECTION -->
     <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
         <div>
             <h1 class="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">Collaborative Workspace 🤝</h1>
-            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Build, edit, and share live grocery lists with your team or family.</p>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Manage and view your shared grocery lists with your team or family.</p>
         </div>
         
         <div class="flex items-center space-x-3">
-            <button onclick="copyWorkspaceShareLink()" class="px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-xs font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer shadow-sm">
-                🔗 Share Link
-            </button>
-            <button onclick="openCollaboratorModal()" class="px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl hover:bg-emerald-100 transition flex items-center gap-2 cursor-pointer shadow-sm">
-                👥 Manage Team
-            </button>
+            <a href="/" class="px-4 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition flex items-center gap-2 cursor-pointer shadow-sm">
+                Start Shopping
+            </a>
         </div>
     </div>
 
-    <!-- MAIN TWO-COLUMN LAYOUT (Matches Cart UI) -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
-        
-        <!-- LEFT COLUMN: ADD ITEMS & CURRENT WORKSPACE ITEMS -->
-        <div class="lg:col-span-5 space-y-6">
-            <!-- Search & Add Box -->
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
-                <h2 class="text-sm font-black uppercase tracking-wider text-gray-400">Add Products</h2>
-                <div class="flex gap-2">
-                    <input type="text" id="collab-search-input" placeholder="Search groceries across stores..." class="flex-grow bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition">
-                    <button onclick="searchCollabProducts()" class="bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-xl transition cursor-pointer shrink-0">Search</button>
-                </div>
-                <div id="collab-search-results" class="space-y-2 max-h-48 overflow-y-auto"></div>
-            </div>
-
-            <!-- Workspace Items List -->
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6">
-                <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4">
-                    <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Workspace Items</h2>
-                    <span class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full"><span id="collab-item-count">0</span> Items</span>
-                </div>
-                
-                <div id="collab-items-container" class="space-y-4 divide-y divide-gray-100 dark:divide-gray-800">
-                    <p class="text-xs font-medium text-gray-400 py-12 text-center">Your collaborative workspace is empty.</p>
-                </div>
-            </div>
+    <!-- TABS & ACTION BAR -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="flex items-center space-x-2">
+            <a href="/saved" id="tab-btn-personal" class="px-4 py-2 rounded-xl text-xs font-black bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition cursor-pointer">Saved Baskets</a>
+            <a href="/collaborative" id="tab-btn-collab" class="px-4 py-2 rounded-xl text-xs font-black bg-brand-dark dark:bg-emerald-600 text-white shadow-sm transition cursor-pointer">Collaborative Lists</a>
         </div>
+        
+        <a href="/" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition cursor-pointer">
+            <span class="text-sm font-black">+</span> New Collaborative List
+        </a>
+    </div>
 
-        <!-- RIGHT COLUMN: TOTAL STORE COMPARISON BREAKDOWN -->
-        <div class="lg:col-span-7 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6">
-            <div class="border-b border-gray-100 dark:border-gray-800 pb-4">
-                <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Total Store Comparison</h2>
-                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Calculated total cost across retailers using live prices.</p>
-            </div>
-            
-            <div id="collab-store-breakdown" class="space-y-4">
-                <p class="text-xs text-gray-400 py-8 text-center">Add items to view store totals.</p>
-            </div>
+    <!-- MAIN GRID CONTAINER -->
+    <div id="collab-baskets-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="col-span-full flex justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
         </div>
     </div>
 </div>
-
-<!-- TEAM COLLABORATOR MODAL -->
-<div id="collaborator-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
-        <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
-            <h3 class="text-lg font-black text-gray-900 dark:text-white">Manage Team Members</h3>
-            <button onclick="closeCollaboratorModal()" class="text-gray-400 hover:text-gray-600 font-bold text-sm cursor-pointer">✕</button>
-        </div>
-        
-        <div class="space-y-4">
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Invite User</label>
-                <input type="text" id="user-search-input" oninput="searchSystemUsers(this.value)" placeholder="Type username..." class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition">
-                <div id="user-search-results" class="mt-2 space-y-2 max-h-40 overflow-y-auto"></div>
-            </div>
-
-            <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Active Collaborators</h4>
-                <div id="collaborators-list-container" class="space-y-2 max-h-48 overflow-y-auto">
-                    <p class="text-xs text-gray-400">No members invited yet.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    let collaborativeItems = [];
-
-    async function searchCollabProducts() {
-        const q = document.getElementById('collab-search-input').value.trim();
-        const resultsContainer = document.getElementById('collab-search-results');
-        if (!q) return;
-
-        resultsContainer.innerHTML = '<p class="text-xs text-gray-400 p-2">Searching stores...</p>';
-        try {
-            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-            const products = await res.json();
-            if (!products.length) {
-                resultsContainer.innerHTML = '<p class="text-xs text-gray-400 p-2">No products found.</p>';
-                return;
-            }
-            resultsContainer.innerHTML = products.slice(0, 5).map(p => `
-                <div class="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-2.5 rounded-xl border border-gray-100 dark:border-gray-700 text-xs">
-                    <div class="flex items-center space-x-2 truncate">
-                        <img src="${p.imageUrl || ''}" class="h-8 w-8 object-contain bg-white rounded-lg p-1 shrink-0" onerror="this.src='https://via.placeholder.com/40';">
-                        <div class="truncate">
-                            <p class="font-bold truncate">${p.name}</p>
-                            <p class="text-[10px] text-gray-400">${p.store} &bull; ${p.formattedPrice || 'R ' + p.price.toFixed(2)}</p>
-                        </div>
-                    </div>
-                    <button onclick='addCollabItem(${JSON.stringify(p)})' class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg shrink-0 cursor-pointer transition">+ Add</button>
-                </div>
-            `).join('');
-        } catch (e) {
-            resultsContainer.innerHTML = '<p class="text-xs text-red-400 p-2">Search failed.</p>';
-        }
-    }
-
-    function addCollabItem(product) {
-        const existing = collaborativeItems.find(i => i.id === product.id);
-        if (existing) {
-            existing.quantity = (existing.quantity || 1) + 1;
-        } else {
-            collaborativeItems.push({
-                id: product.id,
-                name: product.name,
-                store: product.store,
-                price: parseFloat(product.price),
-                formattedPrice: product.formattedPrice || `R ${parseFloat(product.price).toFixed(2)}`,
-                imageUrl: product.imageUrl || '',
-                quantity: 1
-            });
-        }
-        renderCollaborativeWorkspace();
-    }
-
-    function updateCollabQty(productId, change) {
-        const item = collaborativeItems.find(i => i.id === productId);
-        if (item) {
-            item.quantity += change;
-            if (item.quantity <= 0) {
-                collaborativeItems = collaborativeItems.filter(i => i.id !== productId);
-            }
-        }
-        renderCollaborativeWorkspace();
-    }
-
-    function renderCollaborativeWorkspace() {
-        const container = document.getElementById('collab-items-container');
-        document.getElementById('collab-item-count').textContent = collaborativeItems.length;
-
-        if (!collaborativeItems.length) {
-            container.innerHTML = '<p class="text-xs font-medium text-gray-400 py-12 text-center">Your collaborative workspace is empty.</p>';
-            document.getElementById('collab-store-breakdown').innerHTML = '<p class="text-xs text-gray-400 py-8 text-center">Add items to view store totals.</p>';
-            return;
-        }
-
-        container.innerHTML = collaborativeItems.map(item => `
-            <div class="flex items-center justify-between py-4 first:pt-2 last:pb-2 gap-3">
-                <div class="flex items-center space-x-3 sm:space-x-4 min-w-0">
-                    <div class="h-14 w-14 sm:h-16 sm:w-16 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center justify-center p-2 shrink-0 overflow-hidden">
-                        <img src="${item.imageUrl}" class="object-contain h-full w-full" onerror="this.src='https://via.placeholder.com/60';">
-                    </div>
-                    <div class="min-w-0">
-                        <span class="inline-block text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-md mb-1">${item.store}</span>
-                        <h4 class="text-xs sm:text-sm font-bold text-gray-900 dark:text-white break-words whitespace-normal">${item.name}</h4>
-                        <div class="flex items-center space-x-2.5 mt-2">
-                            <button onclick="updateCollabQty('${item.id}', -1)" class="w-7 h-7 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-bold text-xs flex items-center justify-center transition cursor-pointer hover:bg-gray-200">-</button>
-                            <span class="text-xs font-bold text-gray-700 dark:text-gray-300 w-6 text-center">${item.quantity}</span>
-                            <button onclick="updateCollabQty('${item.id}', 1)" class="w-7 h-7 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-bold text-xs flex items-center justify-center transition cursor-pointer hover:bg-gray-200">+</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex items-center space-x-3 shrink-0">
-                    <div class="text-right">
-                        <span class="text-xs text-gray-400 block">Subtotal</span>
-                        <span class="text-sm sm:text-base font-black text-gray-900 dark:text-emerald-400">R ${(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                    <button onclick="updateCollabQty('${item.id}', -${item.quantity})" class="text-gray-400 hover:text-red-600 p-2 cursor-pointer font-black text-sm bg-gray-50 dark:bg-gray-800 rounded-xl transition" title="Remove item">✕</button>
-                </div>
-            </div>
-        `).join('');
-
-        // Generate store price calculations
-        calculateCollabStoreTotals();
-    }
-
-    function calculateCollabStoreTotals() {
-        const breakdownContainer = document.getElementById('collab-store-breakdown');
-        const storeTotals = {};
-        
-        collaborativeItems.forEach(item => {
-            const store = item.store;
-            storeTotals[store] = (storeTotals[store] || 0) + (item.price * item.quantity);
-        });
-
-        const sortedStores = Object.entries(storeTotals).sort((a, b) => a[1] - b[1]);
-
-        breakdownContainer.innerHTML = sortedStores.map(([store, total], index) => `
-            <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border ${index === 0 ? 'border-emerald-500 shadow-sm' : 'border-gray-100 dark:border-gray-800'}">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center font-black text-xs">${index + 1}</div>
-                    <div>
-                        <h4 class="font-bold text-sm text-gray-900 dark:text-white">${store}</h4>
-                        ${index === 0 ? '<span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Cheapest Total Store</span>' : ''}
-                    </div>
-                </div>
-                <span class="text-base font-black text-gray-900 dark:text-emerald-400">R ${total.toFixed(2)}</span>
-            </div>
-        `).join('');
-    }
-
-    function openCollaboratorModal() {
-        document.getElementById('collaborator-modal').classList.remove('hidden');
-    }
-
-    function closeCollaboratorModal() {
-        document.getElementById('collaborator-modal').classList.add('hidden');
-    }
-
-    function copyWorkspaceShareLink() {
-        navigator.clipboard.writeText(window.location.href);
-        showToast('Share link copied to clipboard!');
-    }
-</script>
 {% endblock %}
