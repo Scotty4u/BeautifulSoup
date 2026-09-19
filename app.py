@@ -1023,7 +1023,14 @@ def search_system_users():
     query = request.args.get('q', '').strip()
     if not query:
         return jsonify([])
-    users = User.query.filter(User.username.ilike(f'%{query}%'), User.id != session['user_id']).limit(5).all()
+    
+    # Only search for users who match the query, are NOT the current user, and are NOT admins
+    users = User.query.filter(
+        User.username.ilike(f'%{query}%'), 
+        User.id != session['user_id'],
+        User.is_admin == False
+    ).limit(5).all()
+    
     return jsonify([{'id': u.id, 'username': u.username} for u in users])
 
 @app.route('/api/saved-baskets/<int:basket_id>/collaborators', methods=['GET'])
@@ -1055,7 +1062,16 @@ def invite_collaborator(basket_id):
     target_user_id = int(raw_user_id)
     if target_user_id == session['user_id']:
         return jsonify({'error': 'You cannot invite yourself'}), 400
-    
+        
+    # --- NEW: PREVENT INVITING ADMINS ---
+    target_user = db.session.get(User, target_user_id)
+    if not target_user:
+        return jsonify({'error': 'User not found'}), 404
+        
+    if target_user.is_admin:
+        return jsonify({'error': 'Administrative accounts cannot be invited to lists.'}), 403
+    # ------------------------------------
+
     # Automatically duplicate personal snapshot into a collaborative workspace copy
     target_basket = basket
     if not basket.is_collaborative:
