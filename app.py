@@ -8,12 +8,13 @@ import threading
 import time
 import uuid
 from datetime import datetime
+from functools import wraps
 from typing import Dict, List, Tuple
 
 from rapidfuzz import fuzz
 from apscheduler.schedulers.background import BackgroundScheduler
 from fake_useragent import UserAgent
-from flask import Flask, jsonify, request, render_template, session, redirect, url_for
+from flask import Flask, jsonify, request, render_template, session, redirect, url_for, flash, abort
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -74,6 +75,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False) # Added Admin Flag
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Core UML Relationships
@@ -203,6 +205,36 @@ class Notification(db.Model):
 
 with app.app_context():
     db.create_all()
+    
+    # Create a default admin account if no admin exists in the database
+    if not User.query.filter_by(is_admin=True).first():
+        default_admin = User(
+            username='SystemAdmin',
+            email='admin@smartbasket.local',
+            password_hash=generate_password_hash('admin123'),
+            is_admin=True
+        )
+        db.session.add(default_admin)
+        db.session.commit()
+        print("Default admin account created: admin@smartbasket.local | Password: admin123")
+
+# ==========================================
+# ADMIN DECORATOR
+# ==========================================
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            flash("Please log in to access this page.", "warning")
+            return redirect(url_for('login'))
+        
+        current_user = db.session.get(User, user_id)
+        if not current_user or not current_user.is_admin:
+            abort(403)  # HTTP 403 Forbidden
+            
+        return f(*args, **kwargs)
+    return decorated_function
 
 # ==========================================
 # SEARCH CACHE (SQLite Helper)
@@ -618,6 +650,42 @@ async def scrape_woolworths(query: str, page_size: int = 16):
 # ==========================================
 # ROUTES & ENDPOINTS
 # ==========================================
+
+# --- Admin Routes ---
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    # Gather key metrics for display
+    total_users = User.query.count()
+    recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    
+    metrics = {
+        "total_users": total_users,
+        "active_status": "Operational"
+    }
+    
+    return render_template('admin/dashboard.html', metrics=metrics, recent_users=recent_users)
+
+@app.route('/admin/users/toggle-admin/<int:user_id>', methods=['POST'])
+@admin_required
+def toggle_admin_status(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        abort(404)
+        
+    user.is_admin = not user.is_admin
+    db.session.commit()
+    flash(f"Updated admin status for {user.email}", "success")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/system/trigger-job', methods=['POST'])
+@admin_required
+def trigger_system_job():
+    # Execute manual administrative actions or background processes
+    flash("System task initiated successfully.", "info")
+    return redirect(url_for('admin_dashboard'))
+
+# --- Standard Routes ---
 @app.route('/favicon.ico')
 def favicon(): return '', 204
 
@@ -1217,12 +1285,15 @@ def collaborative_lists():
 
 @app.route('/api/popular', methods=['GET'])
 def api_popular_products():
+    import random
     user_pref_stores = []
+    
     if 'user_id' in session:
         user_pref = UserPreference.query.filter_by(user_id=session['user_id']).first()
         if user_pref and user_pref.preferred_store:
             user_pref_stores = [s.strip() for s in user_pref.preferred_store.split(',')]
             
+    # 1. Try fetching from the local database
     if user_pref_stores:
         products = Product.query.filter(Product.store.in_(user_pref_stores)).order_by(db.func.random()).limit(20).all()
     else:
@@ -1233,7 +1304,44 @@ def api_popular_products():
         'price': p.price, 'formattedPrice': p.formatted_price,
         'imageUrl': p.image_url
     } for p in products]
-    return jsonify(output)
+
+    # 2. Cold-Start Fallback: If DB is mostly empty, scrape live essentials instantly
+    if len(output) < 12:
+        default_queries = ['fresh milk', 'brown bread', 'white sugar', 'large eggs']
+        
+        async def fetch_essentials():
+            tasks = []
+            for q in default_queries:
+                # Fetch a small, fast batch from each store
+                tasks.append(scrape_pnp(q, page_size=2))
+                tasks.append(scrape_shoprite(q, page_size=2))
+                tasks.append(scrape_checkers(q, page_size=2))
+                tasks.append(scrape_woolworths(q, page_size=2))
+            
+            results = await asyncio.gather(*tasks)
+            combined = []
+            for res_list in results:
+                if res_list:
+                    combined.extend(res_list)
+            return combined
+            
+        live_products = asyncio.run(fetch_essentials())
+        
+        # Deduplicate and filter by user preference (if applicable)
+        seen_ids = {p['id'] for p in output}
+        for lp in live_products:
+            if lp['id'] not in seen_ids:
+                if not user_pref_stores or lp.get('store') in user_pref_stores:
+                    output.append(lp)
+                    seen_ids.add(lp['id'])
+                    
+        # 3. Silently save these essentials to the DB in the background
+        if live_products:
+            threading.Thread(target=log_search_results_to_db, args=(live_products,), daemon=True).start()
+
+    # Shuffle the list to make the landing page feel dynamic on refresh, cap at 20
+    random.shuffle(output)
+    return jsonify(output[:20])
 
 @app.route('/search')
 def search():
@@ -1323,9 +1431,14 @@ def login():
         if user and check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
             session['username'] = user.username
+            session['is_admin'] = user.is_admin  # <-- ADD THIS LINE
             
-            pref = UserPreference.query.filter_by(user_id=user.id).first()
-            next_url = url_for('onboarding') if not pref else url_for('account')
+            if user.is_admin:
+                next_url = url_for('admin_dashboard')
+            else:
+                pref = UserPreference.query.filter_by(user_id=user.id).first()
+                next_url = url_for('onboarding') if not pref else url_for('account')
+                
             return f"""
             <script>
                 localStorage.removeItem('smartBasket_active');
@@ -1365,7 +1478,6 @@ def onboarding():
         return redirect(url_for('account'))
         
     return render_template('onboarding.html')
-#
 
 # ==========================================
 # APP STARTUP

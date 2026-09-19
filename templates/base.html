@@ -51,7 +51,7 @@
             <div class="flex items-center justify-between gap-4 lg:gap-6">
                 
                 <div class="flex items-center shrink-0">
-                    <a href="{{ url_for('home') }}" class="flex items-center cursor-pointer mr-6 sm:mr-8">
+                    <a href="{{ url_for('home') }}" class="flex items-center cursor-pointer sm:mr-4">
                         <div class="bg-brand-dark text-white p-1.5 sm:p-2 rounded-xl flex items-center justify-center shadow-sm">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -60,16 +60,26 @@
                         <span class="ml-2.5 text-lg sm:text-xl font-black tracking-tight">SmartBasket</span>
                     </a>
                     
-                    <div class="hidden lg:flex items-center space-x-6 text-sm font-semibold text-gray-500 dark:text-gray-400">
-                        <a href="{{ url_for('search', q='Specials') }}" class="text-brand-dark dark:text-emerald-400 hover:text-brand-dark transition">Specials</a>
-                        <a href="{{ url_for('search', q='Fresh') }}" class="hover:text-brand-dark dark:hover:text-white transition">Fresh & Produce</a>
-                        <a href="{{ url_for('search', q='Pantry') }}" class="hover:text-brand-dark dark:hover:text-white transition">Pantry Staples</a>
-                        <a href="{{ url_for('search', q='Household') }}" class="hover:text-brand-dark dark:hover:text-white transition">Household</a>
+                    <!-- HOVER DROPDOWN FOR CATEGORIES -->
+                    <div class="hidden lg:block relative group ml-4 h-full">
+                        <button class="flex items-center space-x-1 text-sm font-semibold text-gray-500 hover:text-brand-dark dark:text-gray-400 dark:hover:text-white transition py-2 cursor-default">
+                            <span>Browse</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200 group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <!-- Dropdown Menu items -->
+                        <div class="absolute left-0 top-[120%] w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ease-out z-50 overflow-hidden">
+                            <a href="{{ url_for('search', q='Specials') }}" class="block px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">Specials</a>
+                            <a href="{{ url_for('search', q='Fresh') }}" class="block px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-t border-gray-50 dark:border-gray-700/50">Fresh & Produce</a>
+                            <a href="{{ url_for('search', q='Pantry') }}" class="block px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-t border-gray-50 dark:border-gray-700/50">Pantry Staples</a>
+                            <a href="{{ url_for('search', q='Household') }}" class="block px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-t border-gray-50 dark:border-gray-700/50">Household</a>
+                        </div>
                     </div>
                 </div>
 
                 <!-- SEARCH BAR -->
-                <div class="hidden md:flex flex-1 w-full mx-6 lg:mx-10">
+                <div class="hidden md:flex flex-1 w-full mx-2 lg:mx-8 max-w-xl">
                     <form action="{{ url_for('search') }}" method="GET" class="w-full flex items-center rounded-full bg-gray-50 dark:bg-gray-800 px-5 py-2.5 border border-transparent focus-within:bg-white dark:focus-within:bg-gray-900 focus-within:border-gray-200 dark:focus-within:border-gray-700 transition-all duration-300">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                         <input type="text" name="q" class="w-full pl-3 bg-transparent focus:outline-none text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 font-medium" placeholder="Search products across stores..." required>
@@ -77,8 +87,14 @@
                 </div>
 
                 <!-- ICONS & ACTIONS -->
-                <div class="flex items-center space-x-4 sm:space-x-6 shrink-0 text-gray-600 dark:text-gray-300">
+                <div class="flex items-center space-x-3 sm:space-x-5 shrink-0 text-gray-600 dark:text-gray-300">
                     <button onclick="toggleMobileSearch()" class="md:hidden hover:text-brand-dark dark:hover:text-white transition p-1 cursor-pointer"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></button>
+                    
+                    {% if session.get('is_admin') %}
+                    <a href="/admin" class="hidden sm:flex items-center text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-bold text-xs lg:text-sm bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1.5 rounded-lg transition-colors border border-emerald-100 dark:border-emerald-800/50 shrink-0">
+                        Admin Panel
+                    </a>
+                    {% endif %}
                     
                     <!-- NOTIFICATIONS LINK -->
                     <a href="{{ url_for('notifications') }}" class="relative hover:text-brand-dark dark:hover:text-white transition p-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 hidden sm:flex items-center justify-center cursor-pointer" title="Notifications">
@@ -94,7 +110,7 @@
                         </svg>
                     </a>
 
-                    <div class="flex items-center space-x-3 sm:space-x-5 border-l border-gray-200 dark:border-gray-800 pl-4 sm:pl-6">
+                    <div class="flex items-center space-x-2 sm:space-x-4 border-l border-gray-200 dark:border-gray-800 pl-3 sm:pl-5">
                         <a href="{{ url_for('saved_baskets') }}" class="hover:text-brand-dark dark:hover:text-white transition p-2 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 hidden sm:block cursor-pointer" title="Saved Baskets">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -158,6 +174,12 @@
         <div class="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-4">
             <h3 class="text-xs font-black uppercase tracking-wider text-gray-400">Account & Lists</h3>
             <div class="flex flex-col space-y-3 font-semibold text-sm text-gray-700 dark:text-gray-300">
+                {% if session.get('is_admin') %}
+                <a href="/admin" class="flex items-center space-x-3 py-1.5 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span>Admin Panel</span>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('notifications') }}" class="flex items-center space-x-3 py-1.5 hover:text-brand-dark dark:hover:text-white transition">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                     <span>Notifications</span>
