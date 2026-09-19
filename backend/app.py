@@ -21,15 +21,27 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import httpx
 from playwright.async_api import async_playwright
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
-CORS(app)
+# Get absolute path of backend directory and ensure instance folder exists
+basedir = os.path.abspath(os.path.dirname(__file__))
+instance_dir = os.path.join(basedir, 'instance')
+os.makedirs(instance_dir, exist_ok=True)
+
+app = Flask(
+    __name__,
+    instance_path=instance_dir,
+    template_folder='../templates',
+    static_folder='../static'
+)
+
+# Enable CORS with credentials for React frontend (localhost:5173)
+CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 
 # ==========================================
 # DATABASE & CONFIGURATION
 # ==========================================
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
-db_path = 'smartbasket.db'
+db_path = os.path.join(app.instance_path, 'smartbasket.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -75,16 +87,14 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False, nullable=False) # Added Admin Flag
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Core UML Relationships
     baskets = db.relationship('SavedBasket', backref='owner', lazy=True, cascade="all, delete-orphan")
     preference = db.relationship('UserPreference', backref='user', uselist=False, cascade="all, delete-orphan")
     active_cart = db.relationship('ActiveCart', backref='user', uselist=False, cascade="all, delete-orphan")
     reviews = db.relationship('Review', backref='user', lazy=True, cascade="all, delete-orphan")
     
-    # Preserved Latest System Features
     collaborations = db.relationship('SavedBasketCollaborator', backref='user', lazy=True)
     notifications_received = db.relationship('Notification', foreign_keys='Notification.recipient_id', backref='recipient', lazy=True)
 
@@ -117,12 +127,10 @@ class Product(db.Model):
     image_url = db.Column(db.Text)
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
-    # Updated to match UML FKs (Kept 'store' string for scraper backwards compatibility)
     store_id = db.Column(db.Integer, db.ForeignKey('stores.id'), nullable=True) 
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     store = db.Column(db.String(50), index=True) 
     
-    # UML Relationships
     price_history = db.relationship('PriceHistory', backref='product_ref', lazy=True, cascade="all, delete-orphan")
     reviews = db.relationship('Review', backref='product_ref', lazy=True, cascade="all, delete-orphan")
 
@@ -154,7 +162,6 @@ class SavedBasket(db.Model):
     name = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Preserved Latest System Features
     share_token = db.Column(db.String(64), unique=True, default=lambda: uuid.uuid4().hex) 
     is_collaborative = db.Column(db.Boolean, default=False)
     
@@ -181,8 +188,6 @@ class Review(db.Model):
     comment = db.Column(db.Text, nullable=False)
     helpful_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Kept for routing compatibility
     author_name = db.Column(db.String(100), default='Anonymous')
 
 class SavedBasketCollaborator(db.Model):
@@ -190,8 +195,8 @@ class SavedBasketCollaborator(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     saved_basket_id = db.Column(db.Integer, db.ForeignKey('saved_baskets.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    status = db.Column(db.String(20), default='pending') # pending, accepted, declined
-    role = db.Column(db.String(20), default='editor') # editor, viewer
+    status = db.Column(db.String(20), default='pending')
+    role = db.Column(db.String(20), default='editor')
 
 class Notification(db.Model):
     __tablename__ = 'notifications'
@@ -200,13 +205,11 @@ class Notification(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     basket_id = db.Column(db.Integer, db.ForeignKey('saved_baskets.id'), nullable=False)
     message = db.Column(db.String(255), nullable=False)
-    status = db.Column(db.String(20), default='unread') # unread, read
+    status = db.Column(db.String(20), default='unread')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 with app.app_context():
     db.create_all()
-    
-    # Create a default admin account if no admin exists in the database
     if not User.query.filter_by(is_admin=True).first():
         default_admin = User(
             username='SystemAdmin',
@@ -231,8 +234,7 @@ def admin_required(f):
         
         current_user = db.session.get(User, user_id)
         if not current_user or not current_user.is_admin:
-            abort(403)  # HTTP 403 Forbidden
-            
+            abort(403)
         return f(*args, **kwargs)
     return decorated_function
 
@@ -655,7 +657,6 @@ async def scrape_woolworths(query: str, page_size: int = 16):
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    # Gather key metrics for display
     total_users = User.query.count()
     recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
     
@@ -681,7 +682,6 @@ def toggle_admin_status(user_id):
 @app.route('/admin/system/trigger-job', methods=['POST'])
 @admin_required
 def trigger_system_job():
-    # Execute manual administrative actions or background processes
     flash("System task initiated successfully.", "info")
     return redirect(url_for('admin_dashboard'))
 
@@ -925,7 +925,7 @@ def save_basket_to_db():
         return jsonify({'error': 'Authentication required. Please log in.'}), 401
 
     data = request.json or {}
-    basket_id = data.get('basket_id')  # Optional: present if updating an existing list
+    basket_id = data.get('basket_id')
     basket_name = data.get('name', 'My Saved Basket')
     items = data.get('items', [])
     if not items: 
@@ -974,12 +974,10 @@ def save_basket_to_db():
                 competitor_prices=json.dumps(comps)
             ))
 
-        # Notify collaborators if this is an active collaborative list
         if basket.is_collaborative:
             collabs = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket.id, status='accepted').all()
             sender_name = session.get('username', 'Someone')
             
-            # Notify all accepted collaborators except the sender
             for c in collabs:
                 if c.user_id != user_id:
                     db.session.add(Notification(
@@ -989,7 +987,6 @@ def save_basket_to_db():
                         message=f"{sender_name} updated the collaborative list '{basket.name}'."
                     ))
             
-            # Notify the owner if someone else edited it
             if basket.user_id != user_id:
                 db.session.add(Notification(
                     recipient_id=basket.user_id,
@@ -1024,7 +1021,6 @@ def search_system_users():
     if not query:
         return jsonify([])
     
-    # Only search for users who match the query, are NOT the current user, and are NOT admins
     users = User.query.filter(
         User.username.ilike(f'%{query}%'), 
         User.id != session['user_id'],
@@ -1063,16 +1059,13 @@ def invite_collaborator(basket_id):
     if target_user_id == session['user_id']:
         return jsonify({'error': 'You cannot invite yourself'}), 400
         
-    # --- NEW: PREVENT INVITING ADMINS ---
     target_user = db.session.get(User, target_user_id)
     if not target_user:
         return jsonify({'error': 'User not found'}), 404
         
     if target_user.is_admin:
         return jsonify({'error': 'Administrative accounts cannot be invited to lists.'}), 403
-    # ------------------------------------
 
-    # Automatically duplicate personal snapshot into a collaborative workspace copy
     target_basket = basket
     if not basket.is_collaborative:
         collab_basket = SavedBasket(
@@ -1173,10 +1166,8 @@ def get_db_saved_baskets():
     if not user_id:
         return jsonify([])
 
-    # Personal snapshots (non-collaborative)
     owned_personal = SavedBasket.query.filter_by(user_id=user_id, is_collaborative=False).order_by(SavedBasket.created_at.desc()).all()
     
-    # Collaborative lists (owned workspaces + shared with user)
     owned_collab = SavedBasket.query.filter_by(user_id=user_id, is_collaborative=True).all()
     collabs = SavedBasketCollaborator.query.filter_by(user_id=user_id, status='accepted').all()
     shared_basket_ids = [c.saved_basket_id for c in collabs]
@@ -1309,7 +1300,6 @@ def api_popular_products():
         if user_pref and user_pref.preferred_store:
             user_pref_stores = [s.strip() for s in user_pref.preferred_store.split(',')]
             
-    # 1. Try fetching from the local database
     if user_pref_stores:
         products = Product.query.filter(Product.store.in_(user_pref_stores)).order_by(db.func.random()).limit(20).all()
     else:
@@ -1321,14 +1311,12 @@ def api_popular_products():
         'imageUrl': p.image_url
     } for p in products]
 
-    # 2. Cold-Start Fallback: If DB is mostly empty, scrape live essentials instantly
     if len(output) < 12:
         default_queries = ['fresh milk', 'brown bread', 'white sugar', 'large eggs']
         
         async def fetch_essentials():
             tasks = []
             for q in default_queries:
-                # Fetch a small, fast batch from each store
                 tasks.append(scrape_pnp(q, page_size=2))
                 tasks.append(scrape_shoprite(q, page_size=2))
                 tasks.append(scrape_checkers(q, page_size=2))
@@ -1343,7 +1331,6 @@ def api_popular_products():
             
         live_products = asyncio.run(fetch_essentials())
         
-        # Deduplicate and filter by user preference (if applicable)
         seen_ids = {p['id'] for p in output}
         for lp in live_products:
             if lp['id'] not in seen_ids:
@@ -1351,11 +1338,9 @@ def api_popular_products():
                     output.append(lp)
                     seen_ids.add(lp['id'])
                     
-        # 3. Silently save these essentials to the DB in the background
         if live_products:
             threading.Thread(target=log_search_results_to_db, args=(live_products,), daemon=True).start()
 
-    # Shuffle the list to make the landing page feel dynamic on refresh, cap at 20
     random.shuffle(output)
     return jsonify(output[:20])
 
@@ -1447,7 +1432,7 @@ def login():
         if user and check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
             session['username'] = user.username
-            session['is_admin'] = user.is_admin  # <-- ADD THIS LINE
+            session['is_admin'] = user.is_admin
             
             if user.is_admin:
                 next_url = url_for('admin_dashboard')
