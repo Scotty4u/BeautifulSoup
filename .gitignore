@@ -57,3 +57,13 @@ desktop.ini
 .env
 .env.*
 !.env.example
+
+# ============================================================
+# Frontend (React / Vite / Node)
+# ============================================================
+
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/output/
+.vite/
