@@ -1272,126 +1272,32 @@ def modify_saved_basket_item(basket_id, product_id):
     return jsonify({'success': True})
 
 # ==========================================
-# HTML FRONTEND ROUTES
+# HTML FRONTEND ROUTES (Bridged to React)
 # ==========================================
+
+# Redirect all standard app visits on port 5000 to the React frontend
 @app.route('/')
-def home():
-    user_pref_stores = []
-    if 'user_id' in session:
-        user_pref = UserPreference.query.filter_by(user_id=session['user_id']).first()
-        if user_pref and user_pref.preferred_store:
-            user_pref_stores = [s.strip() for s in user_pref.preferred_store.split(',')]
-            
-    return render_template('index.html', user_pref_stores=user_pref_stores)
-
-@app.route('/collaborative')
-def collaborative_lists():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('collaborative.html')
-
-@app.route('/api/popular', methods=['GET'])
-def api_popular_products():
-    import random
-    user_pref_stores = []
-    
-    if 'user_id' in session:
-        user_pref = UserPreference.query.filter_by(user_id=session['user_id']).first()
-        if user_pref and user_pref.preferred_store:
-            user_pref_stores = [s.strip() for s in user_pref.preferred_store.split(',')]
-            
-    if user_pref_stores:
-        products = Product.query.filter(Product.store.in_(user_pref_stores)).order_by(db.func.random()).limit(20).all()
-    else:
-        products = Product.query.order_by(db.func.random()).limit(20).all()
-        
-    output = [{
-        'id': p.id, 'name': p.name, 'store': p.store,
-        'price': p.price, 'formattedPrice': p.formatted_price,
-        'imageUrl': p.image_url
-    } for p in products]
-
-    if len(output) < 12:
-        default_queries = ['fresh milk', 'brown bread', 'white sugar', 'large eggs']
-        
-        async def fetch_essentials():
-            tasks = []
-            for q in default_queries:
-                tasks.append(scrape_pnp(q, page_size=2))
-                tasks.append(scrape_shoprite(q, page_size=2))
-                tasks.append(scrape_checkers(q, page_size=2))
-                tasks.append(scrape_woolworths(q, page_size=2))
-            
-            results = await asyncio.gather(*tasks)
-            combined = []
-            for res_list in results:
-                if res_list:
-                    combined.extend(res_list)
-            return combined
-            
-        live_products = asyncio.run(fetch_essentials())
-        
-        seen_ids = {p['id'] for p in output}
-        for lp in live_products:
-            if lp['id'] not in seen_ids:
-                if not user_pref_stores or lp.get('store') in user_pref_stores:
-                    output.append(lp)
-                    seen_ids.add(lp['id'])
-                    
-        if live_products:
-            threading.Thread(target=log_search_results_to_db, args=(live_products,), daemon=True).start()
-
-    random.shuffle(output)
-    return jsonify(output[:20])
-
 @app.route('/search')
-def search():
-    query = request.args.get('q', '')
-    return render_template('search.html', query=query)
-
-@app.route('/product/<path:product_id>')
-def product(product_id):
-    return render_template('product.html', product_id=product_id)
-
 @app.route('/basket')
-def basket():
-    return render_template('basket.html')
-
 @app.route('/saved')
-def saved_baskets():
-    return render_template('saved_basket.html')
+@app.route('/collaborative')
+@app.route('/notifications')
+def redirect_to_react():
+    # Keep query parameters if they exist (e.g., /search?q=milk)
+    query_string = request.query_string.decode('utf-8')
+    path = request.path
+    redirect_url = f"http://localhost:5173{path}"
+    if query_string:
+        redirect_url += f"?{query_string}"
+    return redirect(redirect_url)
 
-@app.route('/saved/<int:basket_id>')
-def saved_basket_detail(basket_id):
-    basket = db.get_or_404(SavedBasket, basket_id)
-    if not basket.share_token:
-        basket.share_token = uuid.uuid4().hex
-        db.session.commit()
-        
-    user_id = session.get('user_id')
-    requires_acceptance = False
-    
-    if user_id and basket.user_id != user_id:
-        collab = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket_id, user_id=user_id).first()
-        if not collab or collab.status != 'accepted':
-            requires_acceptance = True
-            
-    return render_template('saved_basket_detail.html', basket=basket, requires_acceptance=requires_acceptance)
-
-@app.route('/notifications', endpoint='notifications')
-@app.route('/notifications-page', endpoint='notifications_page')
-def notifications():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('notifications.html')
-
+# Render old auth templates, but redirect back to React upon success
 @app.route('/account')
 def account():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user = db.session.get(User, session['user_id'])
-    user_pref = UserPreference.query.filter_by(user_id=user.id).first()
-    return render_template('account.html', user=user, user_pref=user_pref)
+    # If they are logged in and hit the backend account route, send them to React
+    return redirect('http://localhost:5173/account')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -1413,11 +1319,10 @@ def signup():
         session['user_id'] = new_user.id
         session['username'] = new_user.username
         
-        next_url = url_for('onboarding')
         return f"""
         <script>
             localStorage.removeItem('smartBasket_active');
-            window.location.href = '{next_url}';
+            window.location.href = 'http://localhost:5173/account';
         </script>
         """
     return render_template('signup.html')
@@ -1435,17 +1340,15 @@ def login():
             session['is_admin'] = user.is_admin
             
             if user.is_admin:
-                next_url = url_for('admin_dashboard')
+                return redirect(url_for('admin_dashboard'))
             else:
-                pref = UserPreference.query.filter_by(user_id=user.id).first()
-                next_url = url_for('onboarding') if not pref else url_for('account')
-                
-            return f"""
-            <script>
-                localStorage.removeItem('smartBasket_active');
-                window.location.href = '{next_url}';
-            </script>
-            """
+                # Redirect successful logins directly to the React frontend
+                return f"""
+                <script>
+                    localStorage.removeItem('smartBasket_active');
+                    window.location.href = 'http://localhost:5173/account';
+                </script>
+                """
         else:
             return render_template('login.html', error="Invalid email or password.")
     return render_template('login.html')
@@ -1456,7 +1359,7 @@ def logout():
     return """
     <script>
         localStorage.removeItem('smartBasket_active');
-        window.location.href = '/login';
+        window.location.href = 'http://localhost:5173/';
     </script>
     """
 
@@ -1476,7 +1379,8 @@ def onboarding():
         else:
             user_pref.preferred_store = stores_str
         db.session.commit()
-        return redirect(url_for('account'))
+        # Redirect to React account page after onboarding
+        return redirect('http://localhost:5173/account')
         
     return render_template('onboarding.html')
 
