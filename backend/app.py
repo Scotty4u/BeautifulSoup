@@ -39,7 +39,13 @@ CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 # ==========================================
 # DATABASE & CONFIGURATION
 # ==========================================
-app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+# Use a static secret key in production/development to prevent cookie invalidation on server restart
+app.secret_key = os.environ.get('SECRET_KEY', 'smartbasket-secure-persistent-secret-key-2026')
+
+# Session and Cookie Configuration to prevent logout on page refresh
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # Change to True if running via HTTPS
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 1 day
 
 db_path = os.path.join(app.instance_path, 'smartbasket.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
@@ -229,12 +235,11 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         user_id = session.get('user_id')
         if not user_id:
-            flash("Please log in to access this page.", "warning")
-            return redirect(url_for('login'))
+            return jsonify({'error': 'Authentication required'}), 401
         
         current_user = db.session.get(User, user_id)
         if not current_user or not current_user.is_admin:
-            abort(403)
+            return jsonify({'error': 'Forbidden'}), 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -332,7 +337,7 @@ async def harvest_tokens_for_store(context, store_key: str, url: str):
     except Exception:
         pass
 
-def refresh_tokens_sync():
+def refresh_tokens_sync(target_store='all'):
     async def run_harvest():
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -342,12 +347,15 @@ def refresh_tokens_sync():
             context = await browser.new_context(
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
             )
-            await harvest_tokens_for_store(context, 'pnp', 'https://www.pnp.co.za')
-            await harvest_tokens_for_store(context, 'shoprite', 'https://www.shoprite.co.za')
-            await harvest_tokens_for_store(context, 'checkers', 'https://www.checkers.co.za')
+            if target_store in ['all', 'pnp']:
+                await harvest_tokens_for_store(context, 'pnp', 'https://www.pnp.co.za')
+            if target_store in ['all', 'shoprite']:
+                await harvest_tokens_for_store(context, 'shoprite', 'https://www.shoprite.co.za')
+            if target_store in ['all', 'checkers']:
+                await harvest_tokens_for_store(context, 'checkers', 'https://www.checkers.co.za')
             await browser.close()
             
-    print("[Scheduler] Harvesting WAF tokens...")
+    print(f"[Scheduler] Harvesting WAF tokens for store: {target_store}...")
     asyncio.run(run_harvest())
     print("[Scheduler] Token harvest complete.")
 
@@ -653,37 +661,102 @@ async def scrape_woolworths(query: str, page_size: int = 16):
 # ROUTES & ENDPOINTS
 # ==========================================
 
-# --- Admin Routes ---
-@app.route('/admin')
+# --- Admin API Routes (For React Admin Dashboard) ---
+@app.route('/api/admin/stats', methods=['GET'])
 @admin_required
-def admin_dashboard():
-    total_users = User.query.count()
-    recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
-    
-    metrics = {
-        "total_users": total_users,
-        "active_status": "Operational"
-    }
-    
-    return render_template('admin/dashboard.html', metrics=metrics, recent_users=recent_users)
+def api_admin_stats():
+    return jsonify({
+        "usersCount": User.query.count(),
+        "productsCount": Product.query.count(),
+        "activeScrapers": 4
+    })
 
-@app.route('/admin/users/toggle-admin/<int:user_id>', methods=['POST'])
+@app.route('/api/admin/users', methods=['GET'])
 @admin_required
-def toggle_admin_status(user_id):
+def api_admin_users():
+    users = User.query.all()
+    return jsonify([{
+        "id": u.id,
+        "username": u.username,
+        "email": u.email,
+        "role": "Admin" if u.is_admin else "User",
+        "joined": u.created_at.strftime('%Y-%m-%d')
+    } for u in users])
+
+@app.route('/api/admin/users', methods=['POST'])
+@admin_required
+def api_admin_create_user():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    email = data.get('email', '').strip()
+    password = data.get('password', '').strip()
+    is_admin = bool(data.get('is_admin', False))
+
+    if not username or not email or not password:
+        return jsonify({'error': 'Username, email, and password are required.'}), 400
+
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'A user with this email already exists.'}), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({'error': 'This username is already taken.'}), 400
+
+    try:
+        new_user = User(
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(password),
+            is_admin=is_admin
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': new_user.id,
+                'username': new_user.username,
+                'email': new_user.email,
+                'role': 'Admin' if new_user.is_admin else 'User',
+                'joined': new_user.created_at.strftime('%Y-%m-%d')
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def api_admin_delete_user(user_id):
     user = db.session.get(User, user_id)
     if not user:
-        abort(404)
-        
-    user.is_admin = not user.is_admin
+        return jsonify({'error': 'User not found'}), 404
+    if user.is_admin and User.query.filter_by(is_admin=True).count() <= 1:
+        return jsonify({'error': 'Cannot delete the last remaining administrator.'}), 400
+    
+    db.session.delete(user)
     db.session.commit()
-    flash(f"Updated admin status for {user.email}", "success")
-    return redirect(url_for('admin_dashboard'))
+    return jsonify({'success': True})
 
-@app.route('/admin/system/trigger-job', methods=['POST'])
+@app.route('/api/admin/system/trigger-job', methods=['POST'])
 @admin_required
-def trigger_system_job():
-    flash("System task initiated successfully.", "info")
-    return redirect(url_for('admin_dashboard'))
+def api_admin_trigger_job():
+    store = (request.json or {}).get('store', 'all')
+    try:
+        threading.Thread(target=refresh_tokens_sync, args=(store,), daemon=True).start()
+        return jsonify({'success': True, 'message': f'Scrapers triggered successfully for [{store}].'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/system/clear-cache', methods=['POST'])
+@admin_required
+def api_admin_clear_cache():
+    try:
+        if os.path.exists(CACHE_DB_FILE):
+            os.remove(CACHE_DB_FILE)
+        init_cache_db()
+        return jsonify({'success': True, 'message': 'Search cache successfully flushed.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # --- Standard Routes ---
 @app.route('/favicon.ico')
@@ -1275,7 +1348,6 @@ def modify_saved_basket_item(basket_id, product_id):
 # HTML FRONTEND ROUTES (Bridged to React)
 # ==========================================
 
-# Redirect all standard app visits on port 5000 to the React frontend
 @app.route('/')
 @app.route('/search')
 @app.route('/basket')
@@ -1283,7 +1355,6 @@ def modify_saved_basket_item(basket_id, product_id):
 @app.route('/collaborative')
 @app.route('/notifications')
 def redirect_to_react():
-    # Keep query parameters if they exist (e.g., /search?q=milk)
     query_string = request.query_string.decode('utf-8')
     path = request.path
     redirect_url = f"http://localhost:5173{path}"
@@ -1291,12 +1362,10 @@ def redirect_to_react():
         redirect_url += f"?{query_string}"
     return redirect(redirect_url)
 
-# Render old auth templates, but redirect back to React upon success
 @app.route('/account')
 def account():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    # If they are logged in and hit the backend account route, send them to React
     return redirect('http://localhost:5173/account')
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -1308,6 +1377,9 @@ def signup():
         
         if User.query.filter_by(email=email).first():
             return render_template('signup.html', error="Email already exists.")
+            
+        if User.query.filter_by(username=username).first():
+            return render_template('signup.html', error="Username is already taken.")
             
         new_user = User(
             username=username, email=email, 
@@ -1340,9 +1412,13 @@ def login():
             session['is_admin'] = user.is_admin
             
             if user.is_admin:
-                return redirect(url_for('admin_dashboard'))
+                return f"""
+                <script>
+                    localStorage.removeItem('smartBasket_active');
+                    window.location.href = 'http://localhost:5173/admin';
+                </script>
+                """
             else:
-                # Redirect successful logins directly to the React frontend
                 return f"""
                 <script>
                     localStorage.removeItem('smartBasket_active');
@@ -1379,10 +1455,65 @@ def onboarding():
         else:
             user_pref.preferred_store = stores_str
         db.session.commit()
-        # Redirect to React account page after onboarding
         return redirect('http://localhost:5173/account')
         
     return render_template('onboarding.html')
+
+@app.route('/api/popular', methods=['GET'])
+def get_popular_products():
+    popular_queries = ['milk', 'bread', 'eggs', 'chicken', 'rice', 'sugar', 'cooking oil', 'juice']
+
+    async def fetch_popular():
+        tasks = []
+        for q in popular_queries:
+            tasks.append(scrape_pnp(q, page_size=2))
+            tasks.append(scrape_shoprite(q, page_size=2))
+            tasks.append(scrape_checkers(q, page_size=2))
+            tasks.append(scrape_woolworths(q, page_size=2))
+
+        results = await asyncio.gather(*tasks)
+
+        query_buckets = []
+        for i in range(0, len(results), 4):
+            chunk = results[i:i+4]
+            query_buckets.append(chunk)
+
+        seen_names = []
+        rotated = []
+
+        for q_idx, store_chunks in enumerate(query_buckets):
+            store_idx = q_idx % 4
+            ordered_chunks = store_chunks[store_idx:] + store_chunks[:store_idx]
+            for store_results in ordered_chunks:
+                for p in store_results:
+                    pid = p.get('id', '')
+                    name = p.get('name', '')
+                    if p.get('price', 0) > 0 and pid not in [x['id'] for x in rotated]:
+                        if not any(fuzz.token_set_ratio(name.lower(), x['name'].lower()) > 75 for x in rotated):
+                            rotated.append(p)
+                            break
+
+        return rotated[:24]
+
+    products = asyncio.run(fetch_popular())
+    return jsonify(products)
+
+@app.route('/api/me', methods=['GET'])
+def get_current_user():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'authenticated': False}), 200
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({'authenticated': False}), 200
+    return jsonify({
+        'authenticated': True,
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'is_admin': user.is_admin,
+        'created_at': user.created_at.strftime('%B %Y')
+    })
 
 # ==========================================
 # APP STARTUP
