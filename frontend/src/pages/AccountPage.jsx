@@ -95,8 +95,8 @@ export default function AccountPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <Card className="w-full max-w-md border-0 shadow-xl shadow-slate-200/80">
           <CardContent className="p-10 text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto">
-              <User className="w-10 h-10 text-emerald-600" />
+            <div className="w-20 h-20 rounded-full bg-[#FFF3EB] flex items-center justify-center mx-auto">
+              <User className="w-10 h-10 text-[#FF8C38]" />
             </div>
             <div className="space-y-2">
               <h1 className="text-2xl font-black text-slate-900">Welcome to SmartBasket</h1>
@@ -107,7 +107,7 @@ export default function AccountPage() {
             <div className="flex flex-col gap-3">
               <Button
                 onClick={() => window.location.href = 'http://localhost:5000/login'}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl shadow-md shadow-emerald-200"
+                className="w-full bg-[#FF8C38] hover:bg-[#F07A25] text-white font-bold h-11 rounded-xl shadow-md shadow-[#F07A25]"
               >
                 <LogIn className="w-4 h-4 mr-2" />
                 Sign In

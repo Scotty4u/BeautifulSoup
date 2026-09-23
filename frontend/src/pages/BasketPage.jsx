@@ -323,7 +323,7 @@ export default function BasketPage() {
                     className="w-full text-xs p-2 rounded-lg border border-[#E0E8E1] bg-[#F4F7F4] focus:outline-none"
                     autoFocus
                   />
-                  <button type="submit" className="w-full py-2 bg-[#2E7D32] text-white rounded-lg text-xs font-bold">
+                  <button type="submit" className="w-full py-2 bg-[#F07A25] text-white rounded-lg text-xs font-bold">
                     Confirm Save
                   </button>
                 </form>

@@ -71,13 +71,13 @@ export default function Home() {
 
           <div className="relative z-10 max-w-xl space-y-4">
             <Badge className="bg-white/20 text-white border-0 font-bold text-xs hover:bg-white/20">
-              🇿🇦 South Africa's Smart Grocery Tool
+              DAILY DEALS
             </Badge>
             <h1 className="text-4xl md:text-5xl font-black text-white leading-tight">
               Shop Smarter.<br />Save More.
             </h1>
             <p className="text-emerald-100 text-base leading-relaxed">
-              Compare real-time grocery prices across Pick n Pay, Shoprite, Checkers and Woolworths — all from one place.
+              Wanna buy cheap ? Come browse
             </p>
           </div>
 
