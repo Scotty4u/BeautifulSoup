@@ -148,7 +148,7 @@ export default function AccountPage() {
 
               {/* Avatar */}
               <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-200">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FFF3EB] to-[#FF8C38] flex items-center justify-center shadow-lg shadow-[#FF8C38]">
                   <span className="text-2xl font-black text-white">{initials}</span>
                 </div>
                 {user.is_admin && (
@@ -165,7 +165,7 @@ export default function AccountPage() {
                   variant="secondary"
                   className={user.is_admin
                     ? 'bg-amber-100 text-amber-700 font-bold text-xs'
-                    : 'bg-emerald-100 text-emerald-700 font-bold text-xs'
+                    : 'bg-[#FFF3EB] text-[#FF8C38]  font-bold text-xs'
                   }
                 >
                   {user.is_admin ? '⭐ Admin' : 'Free Account'}
@@ -205,7 +205,7 @@ export default function AccountPage() {
             {ACTION_CARDS.map(({ icon: Icon, title, description, route, label, color, bg }) => (
               <Card
                 key={route}
-                className="border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer group"
+                className="border border-slate-200 hover:border-[#FF8C38] hover:shadow-md transition-all cursor-pointer group"
                 onClick={() => navigate(route)}
               >
                 <CardContent className="p-5 flex items-center gap-4">

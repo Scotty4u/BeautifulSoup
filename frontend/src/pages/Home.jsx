@@ -5,9 +5,8 @@ import { addToCart } from '../utils/cart';
 import { useToast } from '../context/ToastContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Sparkles, TrendingDown, Store } from 'lucide-react';
+import { ShoppingCart, Sparkles, ArrowRight } from 'lucide-react';
 
 const STORE_COLORS = {
   'Pick n Pay':  { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200' },
@@ -15,6 +14,8 @@ const STORE_COLORS = {
   'Checkers':    { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
   'Woolworths':  { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
 };
+
+const ALL_CATEGORIES = ['Grocery', 'Liquor', 'Pharmacy', 'Electronics'];
 
 function StoreBadge({ store }) {
   const colors = STORE_COLORS[store] || { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
@@ -41,17 +42,13 @@ function SkeletonCard() {
   );
 }
 
-const STATS = [
-  { icon: Store, label: '4 Retailers', sub: 'PnP, Shoprite, Checkers, Woolworths' },
-  { icon: TrendingDown, label: 'Live Prices', sub: 'Updated in real-time' },
-  { icon: Sparkles, label: 'Smart Compare', sub: 'Find the best deal instantly' },
-];
-
 export default function Home() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { showToast } = useToast();
+
+  const categories = ['Grocery', 'Liquor', 'Pharmacy', 'Electronics'];
 
   useEffect(() => {
     axios.get('/api/popular')
@@ -60,53 +57,106 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 py-10 space-y-10">
+    <div className="min-h-screen bg-[#F8FAF8] pb-16">
+      
+      {/* ── 1. CATEGORY TOGGLE BAR ── */}
+      <div className="bg-[#E7F3E8] border-b border-slate-200 py-3 mb-8 shadow-xs">
+        <div className="max-w-6xl mx-auto px-4 flex justify-center items-center gap-8 md:gap-14 overflow-x-auto">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => navigate(`/search?category=${encodeURIComponent(cat.toLowerCase())}`, {
+                state: {selectedCategories: [cat]}
+              })}
+              className="text-sm font-semibold text-slate-700 hover:text-[#FF8C38] transition-colors whitespace-nowrap cursor-pointer"
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* ── HERO ── */}
-        <div className="relative rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 px-8 py-12 overflow-hidden shadow-xl shadow-emerald-200">
-          {/* decorative blobs */}
-          <div className="absolute -top-10 -right-10 w-64 h-64 bg-white/5 rounded-full" />
-          <div className="absolute -bottom-16 -left-10 w-80 h-80 bg-white/5 rounded-full" />
+      <div className="max-w-6xl mx-auto px-4 space-y-12">
 
-          <div className="relative z-10 max-w-xl space-y-4">
-            <Badge className="bg-white/20 text-white border-0 font-bold text-xs hover:bg-white/20">
-              DAILY DEALS
-            </Badge>
-            <h1 className="text-4xl md:text-5xl font-black text-white leading-tight">
-              Shop Smarter.<br />Save More.
-            </h1>
-            <p className="text-emerald-100 text-base leading-relaxed">
-              Wanna buy cheap ? Come browse
-            </p>
+        {/* ── 2. HERO SECTION: ORANGE PROMO CARD + SHOPPING CART CARD ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          
+          {/* Left: Orange Daily Deals Card */}
+          <div className="lg:col-span-5 bg-gradient-to-br from-[#FF9800] via-[#FF8008] to-[#FF6B00] rounded-3xl p-8 md:p-10 text-white flex flex-col justify-between shadow-lg shadow-orange-500/10">
+            <div className="space-y-4">
+              <span className="inline-block text-xs font-black tracking-widest uppercase opacity-90">
+                DAILY DEALS
+              </span>
+              <h1 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">
+                Wanna buy cheap? Come browse
+              </h1>
+              <p className="text-white/90 text-sm leading-relaxed pt-2">
+                SmartBasket makes grocery shopping simple, fast, and affordable.
+                Browse fresh produce, pantry essentials, beverages, and household
+                items all in one place, with quality products and great daily deals
+                delivered right to your doorstep.
+              </p>
+            </div>
+
+            <div className="pt-8">
+              <Button
+                onClick={() => navigate('/search?q=deals', { state: { selectedCategories: ALL_CATEGORIES } })}
+                className="bg-white text-slate-900 hover:bg-slate-100 font-bold px-6 py-2.5 rounded-xl text-sm shadow-md cursor-pointer border-0"
+              >
+                Explore offers
+              </Button>
+            </div>
           </div>
 
-          {/* Stats row */}
-          <div className="relative z-10 mt-8 flex flex-wrap gap-4">
-            {STATS.map(({ icon: Icon, label, sub }) => (
-              <div key={label} className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <div className="text-white font-bold text-sm">{label}</div>
-                  <div className="text-emerald-200 text-xs">{sub}</div>
-                </div>
+          {/* Right: Fresh Picks Image Card */}
+          <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+            <div className="w-full h-72 md:h-80 overflow-hidden bg-slate-100">
+              <img
+                src="/fresh-picks.png"
+                alt="Fresh picks grocery basket"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="p-6 md:p-8 space-y-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Fresh picks for your basket</h3>
+                <p className="text-slate-500 text-xs md:text-sm mt-1">
+                  Discover seasonal produce, weekly essentials and curated bundles delivered fast.
+                </p>
               </div>
-            ))}
+
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  onClick={() => navigate('/basket')}
+                  className="bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs rounded-xl px-4 py-2 flex items-center gap-2 cursor-pointer"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  View Shopping List
+                </Button>
+
+                <button 
+                  onClick={() => navigate('/search?q=all', { state: { selectedCategories: ALL_CATEGORIES } })}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  1245+ items <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
+
         </div>
 
-        {/* ── POPULAR ESSENTIALS ── */}
-        <div className="space-y-5">
+        {/* ── 3. POPULAR ESSENTIALS (PRODUCTS GRID) ── */}
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-xl font-black text-slate-900">Popular Essentials</h2>
+              <Sparkles className="w-5 h-5 text-[#FF8C38]" />
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">Popular Essentials</h2>
             </div>
-            <Badge variant="secondary" className="text-xs font-bold">
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
               {loading ? '...' : `${products.length} products`}
-            </Badge>
+            </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -115,10 +165,9 @@ export default function Home() {
               : products.map(product => (
                 <Card
                   key={product.id}
-                  className="border border-slate-200 hover:border-emerald-300 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 overflow-hidden group"
+                  className="border border-[#FFF3EB] hover:border-[#FF8C38] hover:shadow-lg hover:-translate-y-1 transition-all duration-200 overflow-hidden group bg-white rounded-2xl"
                 >
                   <CardContent className="p-4 flex flex-col justify-between h-full space-y-3">
-                    {/* Image */}
                     <div
                       className="h-40 flex items-center justify-center bg-slate-50 rounded-xl cursor-pointer group-hover:bg-emerald-50/50 transition-colors"
                       onClick={() => navigate(`/product/${product.id}`, { state: { product } })}
@@ -127,7 +176,7 @@ export default function Home() {
                         src={product.imageUrl || 'https://placehold.co/200x200/f8fafc/94a3b8?text=No+Image'}
                         alt={product.name}
                         onError={e => { e.target.src = 'https://placehold.co/200x200/f8fafc/94a3b8?text=No+Image'; }}
-                        className="max-h-full max-w-full object-contain drop-shadow-sm"
+                        className="max-h-full max-w-full object-contain drop-shadow-xs"
                       />
                     </div>
 
@@ -151,7 +200,7 @@ export default function Home() {
                           size="sm"
                           variant="outline"
                           onClick={() => { addToCart(product); showToast(`Added ${product.name} to basket!`); }}
-                          className="h-8 text-xs font-bold border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 shrink-0"
+                          className="h-8 text-xs font-bold hover:bg-[#FFF3EB] hover:border-[#FF8C38] hover:text-[#FF8C38] rounded-xl shrink-0 cursor-pointer"
                         >
                           <ShoppingCart className="w-3 h-3 mr-1" />
                           Add

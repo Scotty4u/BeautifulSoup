@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import SkeletonCard from '../components/SkeletonCard';
 import { useToast } from '../context/ToastContext';
 import { addToCart } from '../utils/cart';
 import { Button } from '@/components/ui/button';
+
+const ALL_CATEGORIES = ['Grocery', 'Liquor', 'Pharmacy', 'Electronics'];
 
 // Helper function to map search terms & product data to our 4 categories
 function detectCategory(queryText, productList = []) {
@@ -45,12 +47,30 @@ function detectCategory(queryText, productList = []) {
 }
 
 export default function SearchPage() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const navigate = useNavigate();
+  const query = searchParams.get('q') || searchParams.get('query') || '';
   const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const categories = ['Grocery', 'Pharmacy', 'Liquor', 'Electronics'];
+  // Determine selection: passed state > single detected category > fallback to all
+  const resolveCategories = (q, state) => {
+    if (state?.selectedCategories) return state.selectedCategories;
+    if (q && q !== 'deals' && q !== 'all') {
+      return [detectCategory(q)];
+    }
+    return ALL_CATEGORIES;
+  };
+
+  const [selectedCategories, setSelectedCategories] = useState(() =>
+    resolveCategories(query, location.state)
+  );
+
+  // Re-run whenever the user types a new search or navigates with state
+  useEffect(() => {
+    setSelectedCategories(resolveCategories(query, location.state));
+  }, [query, location.state]);
 
   // --- FILTER & SORT STATES ---
   const [selectedStores, setSelectedStores] = useState({
@@ -67,7 +87,6 @@ export default function SearchPage() {
   const itemsPerPage = 9;
 
   const { showToast } = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!query) return;
@@ -128,14 +147,14 @@ export default function SearchPage() {
       {/* Category Pills Strip - Read-only locked indicators */}
       <div className="bg-[#E7F3E8] border-b border-[#badbbd] px-4 py-2.5">
         <div className="max-w-7xl mx-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {categories.map((cat) => {
-            const isSelected = activeCategory === cat;
+          {ALL_CATEGORIES.map((cat) => {
+            const isSelected = selectedCategories.includes(cat);
             return (
               <div
                 key={cat}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap select-none pointer-events-none ${
                   isSelected
-                    ? 'bg-[#2E7D32] text-white shadow-sm ring-2 ring-[#2E7D32]/20'
+                    ? 'bg-[#FF8C38] text-white shadow-sm ring-2 ring-[#FFF3EB]/20'
                     : 'bg-white/60 text-[#2E7D32]/60'
                 }`}
               >
@@ -184,7 +203,7 @@ export default function SearchPage() {
                       type="checkbox" 
                       checked={selectedStores[store]} 
                       onChange={() => handleStoreToggle(store)}
-                      className="w-4 h-4 rounded text-[#2E7D32] accent-[#2E7D32] cursor-pointer"
+                      className="w-4 h-4 rounded text-[#2E7D32] accent-[#FF8C38] cursor-pointer"
                     />
                     {store}
                   </label>
@@ -194,8 +213,8 @@ export default function SearchPage() {
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Max Price</label>
-                <span className="text-xs font-extrabold text-[#2E7D32]">R {maxPrice}</span>
+                <label className="text-xs font-bold uppercase tracking-wider text-[#FF8C38]">Max Price</label>
+                <span className="text-xs font-extrabold text-[#FF8C38]">R {maxPrice}</span>
               </div>
               <input 
                 type="range" 
@@ -204,7 +223,7 @@ export default function SearchPage() {
                 step="10" 
                 value={maxPrice} 
                 onChange={(e) => { setMaxPrice(Number(e.target.value)); setCurrentPage(1); }}
-                className="w-full accent-[#2E7D32] cursor-pointer"
+                className="w-full accent-[#FF8C38] cursor-pointer"
               />
             </div>
           </div>
@@ -234,7 +253,7 @@ export default function SearchPage() {
                           onClick={() => navigate(`/product/${product.id}`, { state: { product } })}
                         >
                           {/* Promotional Savings Badge positioned safely on top */}
-                          <span className="absolute top-2 right-2 z-10 bg-[#4EAA52] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                          <span className="absolute top-2 right-2 z-10 bg-[#FF8C38] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                             Best Deal
                           </span>
 
@@ -255,14 +274,14 @@ export default function SearchPage() {
                         </div>
 
                         {/* Store Tag */}
-                        <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-[#2E7D32] bg-[#E7F3E8] px-2 py-0.5 rounded mb-1.5">
+                        <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-[#FF8C38] bg-[#FFF3EB] px-2 py-0.5 rounded mb-1.5">
                           {product.store}
                         </span>
 
                         {/* Product Title */}
                         <h3 
                           onClick={() => navigate(`/product/${product.id}`, { state: { product } })} 
-                          className="text-xs font-bold text-slate-800 line-clamp-2 cursor-pointer hover:text-[#2E7D32] transition-colors"
+                          className="text-xs font-bold text-slate-800 line-clamp-2 cursor-pointer hover:text-[#FF8C38] transition-colors"
                         >
                           {product.name}
                         </h3>
@@ -280,7 +299,7 @@ export default function SearchPage() {
                         <Button 
                           onClick={() => { addToCart(product); showToast(`Added ${product.name} to basket!`); }}
                           size="sm"
-                          className="bg-[#2E7D32] hover:bg-[#256629] text-white text-xs font-bold rounded-xl px-3.5 py-1.5 cursor-pointer shadow-sm"
+                          className="bg-[#FF8C38] hover:bg-[#256629] text-white text-xs font-bold rounded-xl px-3.5 py-1.5 cursor-pointer shadow-sm"
                         >
                           Add
                         </Button>
@@ -308,7 +327,7 @@ export default function SearchPage() {
                           onClick={() => handlePageChange(i + 1)}
                           className={`w-8 h-8 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
                             currentPage === i + 1 
-                              ? 'bg-[#2E7D32] text-white shadow-sm' 
+                              ? 'bg-[#FF8C38] text-white shadow-sm' 
                               : 'bg-white text-slate-600 border border-[#E0E8E1] hover:bg-[#E7F3E8]'
                           }`}
                         >

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Home</title>
+    <link rel="stylesheet" href="Css/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
+    />
+    <header>
+      <div class="brand-area">
+        <i
+          class="fas fa-shopping-bag"
+          style="font-size: 30px; color: black; margin-right: 8px"
+        ></i>
+        <p class="brand-name">Smart Basket</p>
+      </div>
+      <div class="right-side">
+        <div class="search-box">
+          <input type="text" placeholder="Search products..." />
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </div>
+      </div>
+      <div class="Content-right">
+        <i class="fa-regular fa-user" style="margin-right: 30px"></i>
+        <i class="fa-regular fa-heart" style="margin-right: 30px"></i>
+        <i class="fa-solid fa-cart-shopping"></i>
+      </div>
+    </header>
+  </head>
+  <body>
+    <div style="justify-items: center">
+      <hr class="divider" />
+    </div>
+    <section class="Category-options">
+      <nav>
+        <ul style="margin-left: 2%">
+          <li><a href="">Grocery</a></li>
+          <li><a href="">Liquor</a></li>
+          <li><a href="">Pharmacy</a></li>
+          <li><a href="">Electronics</a></li>
+        </ul>
+      </nav>
+    </section>
+    <div style="justify-items: center"></div>
+    <section class="Middle-items">
+      <div class="Middle-items-Left">
+        <p style="font-weight: bold">DAILY DEALS</p>
+        <br />
+        <h1>Wanna buy cheap? Come browse</h1>
+        <br />
+        <p style="font-size: 15px">
+          SmartBasket makes grocery shopping simple, fast, and affordable.
+          Browse fresh produce, pantry essentials, beverages, and household
+          items all in one place, with quality products and great daily deals
+          delivered right to your doorstep.
+        </p>
+        <br />
+        <button>Explore offers</button>
+      </div>
+      <div class="Middle-items-Right">
+        <div>
+          <img src="imgs/8ceb7c74-454f-4f98-9787-1193d443623f.png" alt="" />
+        </div>
+        <div style="padding-left: 2%">
+          <br />
+          <h4>Fresh picks for your basket</h4>
+          <br />
+          <p>
+            Discover seasonal produce, weekly essentials and curated
+            bundle-delivered fast
+          </p>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              margin-top: 5%;
+              margin-bottom: 2%;
+              padding-right: 2%;
+            "
+          >
+            <button>
+              <i class="fa fa-shopping-cart" aria-hidden="true"></i> View
+              Shopping List
+            </button>
+            <span style="color: rgb(147, 147, 148); font-size: 13px"
+              >1245+ items <i class="fa fa-arrow-right" aria-hidden="true"></i
+            ></span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <br />
+    <br />
+    <section class="Discover-items">
+      <div style="justify-items: center"><h3>Discover Items</h3></div>
+      <hr class="small-divider" style="width: 35px" />
+      <section class="Deals-section">
+        <div class="">
+          <div class="Top-images" style="display: flex">
+            <div class="pop-effect-image">
+              <div class="left-image">
+                <h4 style="color: #eef4fd">
+                  Grocery <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                </h4>
+              </div>
+            </div>
+            <div>
+              <div class="pop-effect-image">
+                <div class="right-top">
+                  <h4 style="color: #eef4fd">
+                    Liqour
+                    <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                  </h4>
+                </div>
+              </div>
+              <div class="Bottom" style="display: flex; margin-top: 0px">
+                <div class="watch">
+                  <h4 style="color: #eef4fd">
+                    Pharmacy
+                    <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                  </h4>
+                </div>
+                <div class="electronics">
+                  <h4 style="color: #eef4fd">
+                    Electronics
+                    <i class="fa fa-arrow-right" aria-hidden="true"></i>
+                  </h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </body>
+     <footer>
+      <br/>
+      <div style="width: 300px; margin-left: -100px; margin-top: 25px;">
+        <div style="display: flex;">
+          <i
+          class="fas fa-shopping-bag"
+          style="font-size: 30px; color: black; margin-right: 8px"
+        ></i>
+        <h2>SmartBasket</h2>
+        </div>
+        <br>
+        <br>
+        <p style="color: black;">SmartBasket makes grocery shopping simple, fast, and affordable. Browse fresh produce, pantry essentials, beverages, and household items all in one place, with quality products and great daily deals delivered right to your doorstep.</p>
+      </div>
+
+      <div class="form" style="margin-top: 5px;">
+        <section class="form">
+        <form action="\submit_form" method="post">
+          <label for="name" style="color: black;">Name:</label><br />
+          <input type="text" name="name" id="name" style=" background: #eef4fd; height: 25px; border-radius: 5px;" required/><br />
+          <label for="surname" style="color: black;">Surname:</label><br />
+          <input type="text" name="surname" id="surname" style="background: #eef4fd; height: 25px; border-radius: 5x;"  required /><br />
+          <label for="phone" style="color: black;">Phone:</label><br />
+          <input type="tel" name="phone" id="phone" style="background: #eef4fd; height: 25px; border-radius: 5px;"  required /><br />
+          <label for="email" style="color: black;">Email:</label><br />
+          <input type="email" name="email" id="email" style="background: #eef4fd; height: 25px; border-radius: 5px;"  required /><br /><br />
+
+          <label for="budget"style="color: black; ">Budget Range:</label><br />
+          <select name="Budget_Range" id="Budget_Range" style="height: 25px; width: 200px;">
+            <optgroup label="Min-Max">
+              <option value="">R100-R300</option>
+              <option value="">R300-R500</option>
+              <option value="">R500-R1000</option>
+              <option value="">R1000-R30000</option>
+              <option value="">R3000-R5000</option>
+            </optgroup></select
+          ><br /><br />
+          <input type="submit" id="button" value="Request !!">
+          <br/>
+        </form>
+      </div>
+      <section class="Icons" style="margin-top: 25px;">
+        <div class="facebook" style="display: flex;">
+          <img
+            src="imgs/facebook-logo-facebook-icon-transparent-free-png.webp"
+            alt=""
+            style="width: 50px; height: 50px; border-radius: 360%"
+          />
+          <p style="color: black; margin-left: 20px; margin-top: 18px;">@SmartBasket</p>
+
+        </div>
+
+        <div class="twitter" style="display: flex;">
+          <img
+            src="imgs/twitter.jpg"
+            alt=""
+            style="width: 50px; height: 50px; border-radius: 360%"
+          />
+          <p style="color: black; margin-left: 20px; margin-top: 18px;">@SmartBasket</p>
+        </div>
+
+        <div class="instagram" style="display: flex;">
+          <img
+            src="imgs/instagram-6338393_1280.webp"
+            alt=""
+            style="width: 50px; height: 50px; border-radius: 360%"
+          />
+          <p style="color: black; margin-left: 20px; margin-top: 18px;">@SmartBasket</p>
+        </div>
+      </section>
+    <br/>
+    <br/>
+    <br/>
+
+      
+    </footer>
+</html>

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow space-y-6">
+    
+    <!-- PAGE HEADER -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
+        <div>
+            <a href="{{ url_for('saved_baskets') }}" class="inline-flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-brand-dark font-bold text-sm transition cursor-pointer mb-2">
+                <span>&larr; Back to Saved Baskets</span>
+            </a>
+            <h1 class="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">{{ basket.name }} 🤝</h1>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Collaborative Workspace &bull; Created {{ basket.created_at.strftime('%Y-%m-%d') }} &bull; <span id="item-count-badge">{{ basket.items|length }}</span> item(s)</p>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <button onclick="copyPublicShareLink()" class="px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-xs font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer shadow-sm">
+                🔗 Share Link
+            </button>
+            <div id="collaborator-trigger-container"></div>
+            <button onclick="loadSavedBasketAsActive()" class="bg-brand-dark dark:bg-emerald-600 hover:bg-black text-white font-bold px-5 py-2.5 rounded-xl shadow-sm transition cursor-pointer">
+                Load to Active Cart
+            </button>
+        </div>
+    </div>
+
+    <!-- PENDING INVITE BLUR CONTAINER -->
+    <div id="workspace-content-wrapper" class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start {% if requires_acceptance %}filter blur-md pointer-events-none select-none{% endif %} transition duration-300">
+        
+        <!-- LEFT COLUMN: ITEMS LIST -->
+        <div class="lg:col-span-5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6 transition-colors">
+            <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4">
+                <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Workspace Items</h2>
+                <span class="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold px-3 py-1 rounded-full"><span id="header-item-count">{{ basket.items|length }}</span> Items</span>
+            </div>
+            
+            <div class="space-y-4 divide-y divide-gray-100 dark:divide-gray-800">
+                {% if basket.items %}
+                    {% for item in basket.items %}
+                    <div class="flex items-center justify-between py-4 first:pt-2 last:pb-2 gap-3" data-product-id="{{ item.product.id if item.product else item.product_id }}">
+                        <div class="flex items-center space-x-3 sm:space-x-4 min-w-0">
+                            <div class="h-14 w-14 sm:h-16 sm:w-16 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center justify-center p-2 shrink-0 overflow-hidden">
+                                <img src="{{ item.product.image_url if item.product else '' }}" class="object-contain h-full w-full" onerror="this.src='https://via.placeholder.com/60';">
+                            </div>
+                            <div class="min-w-0">
+                                <span class="inline-block text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-md mb-1">{{ item.product.store if item.product else 'Store' }}</span>
+                                <h4 class="text-xs sm:text-sm font-bold text-gray-900 dark:text-white break-words whitespace-normal">{{ item.product.name if item.product else 'Product' }}</h4>
+                                
+                                <div class="flex items-center space-x-2.5 mt-2">
+                                    <button onclick="updateCollabItemQuantity({{ basket.id }}, '{{ item.product.id if item.product else item.product_id }}', -1)" class="w-7 h-7 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-bold text-xs flex items-center justify-center transition cursor-pointer hover:bg-gray-200">-</button>
+                                    <span class="text-xs font-bold text-gray-700 dark:text-gray-300 w-6 text-center">{{ item.quantity }}</span>
+                                    <button onclick="updateCollabItemQuantity({{ basket.id }}, '{{ item.product.id if item.product else item.product_id }}', 1)" class="w-7 h-7 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-bold text-xs flex items-center justify-center transition cursor-pointer hover:bg-gray-200">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="text-right">
+                                <span class="text-xs text-gray-400 block">Subtotal</span>
+                                <span class="text-sm sm:text-base font-black text-gray-900 dark:text-emerald-400">R {{ "%.2f"|format(item.price * item.quantity) }}</span>
+                            </div>
+                            <button onclick="removeCollabItem({{ basket.id }}, '{{ item.product.id if item.product else item.product_id }}')" class="text-gray-400 hover:text-red-600 p-2 cursor-pointer font-black text-sm bg-gray-50 dark:bg-gray-800 rounded-xl transition" title="Remove item">✕</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-sm font-medium text-gray-400 py-12 text-center">This workspace contains no items.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: TOTAL STORE COMPARISON -->
+        <div class="lg:col-span-7 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6 transition-colors">
+            <div class="border-b border-gray-100 dark:border-gray-800 pb-4">
+                <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white">Total Store Comparison</h2>
+                <p class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">Calculated total cost using live retailer prices today.</p>
+            </div>
+            <div id="detail-saved-breakdown" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- ACCEPT INVITATION BLOCKING MODAL -->
+    {% if requires_acceptance %}
+    <div id="accept-invite-modal" class="fixed inset-x-0 bottom-0 top-16 bg-black/60 z-30 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center space-y-5">
+            <span class="text-4xl block">🤝</span>
+            <div>
+                <h3 class="text-lg font-black text-gray-900 dark:text-white tracking-tight">Collaboration Invitation</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1.5">You have been invited to collaborate on <span class="font-bold text-gray-800 dark:text-gray-200">"{{ basket.name }}"</span>. Accept the invitation to view and edit list items.</p>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button onclick="respondToInvite('decline')" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl transition cursor-pointer">Decline</button>
+                <button onclick="respondToInvite('accept')" class="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer">Accept Invite</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- COLLABORATOR MANAGEMENT MODAL -->
+<div id="collaborator-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
+        <div class="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
+            <h3 class="text-lg font-black text-gray-900 dark:text-white">Manage List Collaborators</h3>
+            <button onclick="closeCollabModal()" class="text-gray-400 hover:text-gray-600 font-bold text-sm cursor-pointer">✕</button>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Search System User</label>
+                <input type="text" id="user-search-input" oninput="searchSystemUsers(this.value)" placeholder="Type username..." class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition">
+                <div id="user-search-results" class="mt-2 space-y-2 max-h-40 overflow-y-auto"></div>
+            </div>
+            <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Current Team Members</h4>
+                <div id="collaborators-list-container" class="space-y-2 max-h-48 overflow-y-auto">
+                    <p class="text-xs text-gray-400">Loading team members...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function updateCollabItemQuantity(basketId, productId, change) {
+        try {
+            const res = await fetch(`/api/db/saved-baskets/${basketId}/items/${productId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ change: change })
+            });
+            if (res.ok) { location.reload(); } else { showToast('Failed to update item quantity.'); }
+        } catch (e) { showToast('Connection error.'); }
+    }
+
+    async function removeCollabItem(basketId, productId) {
+        try {
+            const res = await fetch(`/api/db/saved-baskets/${basketId}/items/${productId}`, { method: 'DELETE' });
+            if (res.ok) { showToast('Item removed from workspace.'); location.reload(); } else { showToast('Failed to remove item.'); }
+        } catch (e) { showToast('Connection error.'); }
+    }
+
+    async function respondToInvite(action) {
+        try {
+            const res = await fetch('/api/notifications', { method: 'GET' });
+            const notifs = await res.json();
+            const targetNotif = notifs.find(n => n.basket_id === {{ basket.id }});
+            
+            if (targetNotif) {
+                const resp = await fetch(`/api/notifications/${targetNotif.id}/respond`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action })
+                });
+                if (resp.ok) {
+                    if (action === 'accept') {
+                        showToast('Invitation accepted!');
+                        location.reload();
+                    } else {
+                        window.location.href = "{{ url_for('saved_baskets') }}";
+                    }
+                }
+            } else {
+                window.location.href = "{{ url_for('saved_baskets') }}";
+            }
+        } catch (e) {
+            showToast('Failed to respond to invite.');
+        }
+    }
+</script>
+
+<script id="basket-data" type="application/json">
+{
+    "id": {{ basket.id | tojson | safe }},
+    "name": {{ basket.name | tojson | safe }},
+    "share_token": {{ (basket.share_token or '') | tojson | safe }},
+    "items": [
+        {% for item in basket.items %}
+        {
+            "id": {{ (item.product.id if item.product else item.product_id) | tojson | safe }},
+            "name": {{ (item.product.name if item.product else 'Unknown Product') | tojson | safe }},
+            "store": {{ (item.product.store if item.product else 'Unknown') | tojson | safe }},
+            "price": {{ item.price }},
+            "quantity": {{ item.quantity }},
+            "imageUrl": {{ (item.product.image_url if item.product else '') | tojson | safe }},
+            "competitors": {% if item.competitor_prices %}{{ item.competitor_prices | safe }}{% else %}[]{% endif %}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ]
+}
+</script>
+{% endblock %}

@@ -50,7 +50,7 @@ export default function SavedBasketsPage() {
             return (
               <Card 
                 key={b.id} 
-                className="group border border-slate-200 hover:border-emerald-500/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between rounded-2xl bg-white"
+                className="group border border-slate-200 hover:border-[#FF8C38] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between rounded-2xl bg-white"
                 onClick={() => navigate(`/saved/${b.id}`)}
               >
                 <CardContent className="p-6 flex flex-col h-full justify-between gap-5">
@@ -93,7 +93,7 @@ export default function SavedBasketsPage() {
                     <span className="text-xs font-extrabold text-slate-700 group-hover:text-[#FF8C38] transition-colors">
                       View Basket Details
                     </span>
-                    <div className="w-8 h-8 rounded-full bg-slate-50 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-colors text-slate-600">
+                    <div className="w-8 h-8 rounded-full bg-[#FFF3EB] group-hover:bg-[#FF8C38] group-hover:text-white flex items-center justify-center transition-colors text-slate-600">
                       <ChevronRight className="w-4 h-4" />
                     </div>
                   </div>

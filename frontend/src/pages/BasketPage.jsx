@@ -357,7 +357,7 @@ export default function BasketPage() {
             {/* Left Accordion Stores Breakdown */}
             <div className="lg:col-span-2 flex flex-col gap-4">
               {loadingComparison ? (
-                <div className="bg-white rounded-2xl border border-[#E0E8E1] p-8 text-center text-slate-500 font-medium">
+                <div className="bg-white rounded-2xl border border-[#FF8C38] p-8 text-center text-slate-500 font-medium">
                   Calculating real-time comparison across Shoprite, Checkers, Boxer, and Pick n Pay...
                 </div>
               ) : (
@@ -369,7 +369,7 @@ export default function BasketPage() {
                     <div 
                       key={st.store} 
                       className={`bg-white rounded-2xl border transition-all overflow-hidden ${
-                        isBest ? 'border-[#4EAA52] ring-1 ring-[#4EAA52]/20 shadow-sm' : 'border-[#E0E8E1]'
+                        isBest ? 'border-[#FF8C38] ring-1 ring-[#FF8C38] shadow-sm' : 'border-[#E0E8E1]'
                       }`}
                     >
                       {/* Accordion Header */}
@@ -378,10 +378,10 @@ export default function BasketPage() {
                         className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 select-none"
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`w-2.5 h-2.5 rounded-full ${isBest ? 'bg-[#4EAA52]' : 'bg-slate-300'}`} />
+                          <span className={`w-2.5 h-2.5 rounded-full ${isBest ? 'bg-[#FF8C38]' : 'bg-slate-300'}`} />
                           <span className="font-extrabold text-sm text-slate-800">{st.store}</span>
                           {isBest && (
-                            <span className="text-[10px] font-bold text-[#2E7D32] bg-[#E7F3E8] px-2 py-0.5 rounded">
+                            <span className="text-[10px] font-bold text-[#FF8C38] bg-[#FFF3EB] px-2 py-0.5 rounded">
                               CHEAPEST
                             </span>
                           )}
@@ -425,14 +425,14 @@ export default function BasketPage() {
               </div>
 
               {cheapestStore && (
-                <div className="bg-[#E7F3E8] border border-[#bfe0c2] p-4 rounded-xl flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-[#2E7D32] shrink-0 mt-0.5" />
+                <div className="bg-[#FFF3EB] border border-[#FF8C38] p-4 rounded-xl flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-[#FF8C38] shrink-0 mt-0.5" />
                   <div className="text-xs">
-                    <p className="font-bold text-[#2E7D32]">
+                    <p className="font-bold text-[#FF8C38]">
                       {cheapestStore.store} is Cheaper!
                     </p>
                     <p className="text-slate-600 mt-0.5 leading-relaxed">
-                      You save <strong className="text-[#2E7D32]">R {potentialSavings.toFixed(2)}</strong> by choosing to shop your basket at {cheapestStore.store}.
+                      You save <strong className="text-[#FF8C38]">R {potentialSavings.toFixed(2)}</strong> by choosing to shop your basket at {cheapestStore.store}.
                     </p>
                   </div>
                 </div>
@@ -450,7 +450,7 @@ export default function BasketPage() {
 
               <div className="flex justify-between items-baseline">
                 <span className="text-xs font-bold text-slate-700">Best Basket Price</span>
-                <span className="text-xl font-black text-[#2E7D32]">
+                <span className="text-xl font-black text-[#FF8C38]">
                   {cheapestStore ? `R ${cheapestStore.total.toFixed(2)}` : 'R 0.00'}
                 </span>
               </div>
