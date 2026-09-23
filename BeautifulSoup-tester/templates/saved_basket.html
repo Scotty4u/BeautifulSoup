@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow space-y-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">Saved Lists & Workspaces 📦</h1>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Manage your personal snapshots and active workspaces.</p>
+        </div>
+    </div>
+
+    <!-- TABS & ACTION BAR -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="flex items-center space-x-2">
+            <button onclick="switchSavedTab('personal')" id="tab-btn-personal" class="px-4 py-2 rounded-xl text-xs font-black bg-brand-dark dark:bg-emerald-600 text-white shadow-sm transition cursor-pointer">Saved Baskets</button>
+            <!-- Clicking Collaborative Lists now redirects to your dedicated separate page -->
+            <a href="/collaborative" id="tab-btn-collab" class="px-4 py-2 rounded-xl text-xs font-black bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition cursor-pointer">Collaborative Lists</a>
+        </div>
+        
+        <!-- DIRECT + BUTTON TO DEDICATED COLLABORATIVE PAGE -->
+        <a href="/collaborative" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition cursor-pointer">
+            <span class="text-sm font-black">+</span> New Collaborative List
+        </a>
+    </div>
+
+    <!-- CONTAINER FOR PERSONAL SAVED BASKETS -->
+    <div id="saved-baskets-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <p class="text-xs text-gray-400 dark:text-gray-500 py-8">Loading lists...</p>
+    </div>
+</div>
+
+<script>
+    async function fetchSavedBaskets() {
+        try {
+            const res = await fetch('/api/db/saved-baskets');
+            const allSavedBaskets = await res.json();
+            // Show only personal snapshots here since collaborative lists have their own dedicated page
+            renderBaskets(allSavedBaskets.filter(b => !b.is_shared));
+        } catch (e) {
+            document.getElementById('saved-baskets-list-container').innerHTML = '<p class="text-xs text-red-500 py-8 col-span-2 text-center">Failed to load lists.</p>';
+        }
+    }
+
+    function renderBaskets(baskets) {
+        const container = document.getElementById('saved-baskets-list-container');
+        if (!baskets.length) {
+            container.innerHTML = '<p class="text-xs text-gray-400 dark:text-gray-500 py-8 col-span-2 text-center">No personal saved baskets found.</p>';
+            return;
+        }
+        container.innerHTML = baskets.map(b => `
+            <a href="/saved/${b.id}" class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm hover:border-emerald-500 transition block">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-black text-gray-900 dark:text-white text-base">${b.name}</h3>
+                    <span class="text-[10px] font-bold px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-md">${b.date}</span>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">${b.items.length} item(s)</p>
+                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">&rarr; Open Snapshot</span>
+            </a>
+        `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', fetchSavedBaskets);
+</script>
+{% endblock %}
