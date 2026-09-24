@@ -7,7 +7,7 @@ import tempfile
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from typing import Dict, List, Tuple
 
@@ -39,10 +39,8 @@ CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 # ==========================================
 # DATABASE & CONFIGURATION
 # ==========================================
-# Use a static secret key in production/development to prevent cookie invalidation on server restart
 app.secret_key = os.environ.get('SECRET_KEY', 'smartbasket-secure-persistent-secret-key-2026')
 
-# Session and Cookie Configuration to prevent logout on page refresh
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False  # Change to True if running via HTTPS
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 1 day
@@ -94,6 +92,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False) # Added for Admin banning
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     baskets = db.relationship('SavedBasket', backref='owner', lazy=True, cascade="all, delete-orphan")
@@ -103,6 +102,14 @@ class User(db.Model):
     
     collaborations = db.relationship('SavedBasketCollaborator', backref='user', lazy=True)
     notifications_received = db.relationship('Notification', foreign_keys='Notification.recipient_id', backref='recipient', lazy=True)
+    search_history = db.relationship('SearchHistory', backref='user', lazy=True)
+
+class SystemLog(db.Model):
+    __tablename__ = 'system_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(255), nullable=False)
+    details = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Store(db.Model):
     __tablename__ = 'stores'
@@ -118,7 +125,7 @@ class Store(db.Model):
 class Category(db.Model):
     __tablename__ = 'categories'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text)
     icon_url = db.Column(db.String(255))
     
@@ -139,6 +146,23 @@ class Product(db.Model):
     
     price_history = db.relationship('PriceHistory', backref='product_ref', lazy=True, cascade="all, delete-orphan")
     reviews = db.relationship('Review', backref='product_ref', lazy=True, cascade="all, delete-orphan")
+    deals = db.relationship('StoreDeal', backref='product_ref', lazy=True, cascade="all, delete-orphan")
+
+class StoreDeal(db.Model):
+    __tablename__ = 'store_deals'
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.String(100), db.ForeignKey('products.id'), nullable=False)
+    original_price = db.Column(db.Float, nullable=False)
+    sale_price = db.Column(db.Float, nullable=False)
+    valid_until = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SearchHistory(db.Model):
+    __tablename__ = 'search_history'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    query = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class PriceHistory(db.Model):
     __tablename__ = 'price_history'
@@ -153,6 +177,7 @@ class UserPreference(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
     preferred_store = db.Column(db.String(50), nullable=False)
+    monthly_budget = db.Column(db.Float, default=0.0) # Re-added for Budget Guardrails
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class ActiveCart(db.Model):
@@ -173,6 +198,7 @@ class SavedBasket(db.Model):
     
     items = db.relationship('BasketItem', backref='basket', cascade='all, delete-orphan')
     collaborators = db.relationship('SavedBasketCollaborator', backref='basket_ref', cascade='all, delete-orphan')
+    activities = db.relationship('BasketActivity', backref='basket', cascade='all, delete-orphan', order_by='BasketActivity.created_at.desc()')
 
 class BasketItem(db.Model):
     __tablename__ = 'basket_items'
@@ -184,6 +210,16 @@ class BasketItem(db.Model):
     competitor_prices = db.Column(db.Text, nullable=True)
     
     product = db.relationship('Product')
+
+class BasketActivity(db.Model):
+    __tablename__ = 'basket_activities'
+    id = db.Column(db.Integer, primary_key=True)
+    basket_id = db.Column(db.Integer, db.ForeignKey('saved_baskets.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    action = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='activities')
 
 class Review(db.Model):
     __tablename__ = 'reviews'
@@ -214,21 +250,60 @@ class Notification(db.Model):
     status = db.Column(db.String(20), default='unread')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# ==========================================
+# DATABASE SEEDER
+# ==========================================
+def seed_database():
+    stores = [
+        {'name': 'Checkers', 'store_key': 'checkers', 'website_url': 'https://www.checkers.co.za'},
+        {'name': 'Shoprite', 'store_key': 'shoprite', 'website_url': 'https://www.shoprite.co.za'},
+        {'name': 'Pick n Pay', 'store_key': 'pnp', 'website_url': 'https://www.pnp.co.za'},
+        {'name': 'Woolworths', 'store_key': 'woolworths', 'website_url': 'https://www.woolworths.co.za'}
+    ]
+    for s_data in stores:
+        if not Store.query.filter_by(name=s_data['name']).first():
+            db.session.add(Store(**s_data))
+
+    categories = [
+        {'name': 'Dairy & Fresh Milk', 'description': 'Milk, butter, cheese, and yogurt'},
+        {'name': 'Fruits & Juices', 'description': 'Fresh fruit and fruit juices'},
+        {'name': 'Pantry Staples', 'description': 'Rice, pasta, oil, sugar, and flour'},
+        {'name': 'Bakery & Breads', 'description': 'Fresh baked breads and rolls'},
+        {'name': 'Snacks & Treats', 'description': 'Chips, chocolates, and biscuits'},
+        {'name': 'Meat & Poultry', 'description': 'Chicken, beef, steak, and mince'}
+    ]
+    for c_data in categories:
+        if not Category.query.filter_by(name=c_data['name']).first():
+            db.session.add(Category(**c_data))
+            
+    db.session.commit()
+    print("Database seeding completed: Stores and Categories populated.")
+
 with app.app_context():
     db.create_all()
+    seed_database()
     if not User.query.filter_by(is_admin=True).first():
         default_admin = User(
             username='SystemAdmin',
             email='admin@smartbasket.local',
             password_hash=generate_password_hash('admin123'),
-            is_admin=True
+            is_admin=True,
+            is_active=True
         )
         db.session.add(default_admin)
         db.session.commit()
         print("Default admin account created: admin@smartbasket.local | Password: admin123")
 
+def log_system_event(action: str, details: str = None):
+    try:
+        new_log = SystemLog(action=action, details=details)
+        db.session.add(new_log)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 # ==========================================
-# ADMIN DECORATOR
+# ADMIN DECORATOR & STATUS CHECK
 # ==========================================
 def admin_required(f):
     @wraps(f)
@@ -240,6 +315,18 @@ def admin_required(f):
         current_user = db.session.get(User, user_id)
         if not current_user or not current_user.is_admin:
             return jsonify({'error': 'Forbidden'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def check_active_status(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if user_id:
+            current_user = db.session.get(User, user_id)
+            if current_user and not current_user.is_active:
+                session.clear()
+                return jsonify({'error': 'Account suspended. Please contact support.'}), 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -282,23 +369,47 @@ def save_to_cache(store_key: str, query: str, data: list):
         pass
 
 def log_search_results_to_db(products_list):
+    if not products_list:
+        return
     try:
         with app.app_context():
             for item in products_list:
-                existing = db.session.get(Product, item['id'])
+                prod_id = str(item.get('id', ''))
+                if not prod_id:
+                    continue
+                
+                existing = db.session.get(Product, prod_id)
+                store_name = item.get('store', 'Unknown')
+                store_record = Store.query.filter_by(name=store_name).first()
+                store_id = store_record.id if store_record else None
+                price_val = float(item.get('price', 0.0))
+
                 if not existing:
                     new_p = Product(
-                        id=item['id'],
-                        name=item['name'],
-                        store=item['store'],
-                        price=float(item['price']),
-                        formatted_price=item.get('formattedPrice', f"R {float(item['price']):.2f}"),
+                        id=prod_id,
+                        name=item.get('name', 'Unknown Product'),
+                        store=store_name,
+                        store_id=store_id,
+                        price=price_val,
+                        formatted_price=item.get('formattedPrice', f"R {price_val:.2f}"),
                         image_url=item.get('imageUrl', '')
                     )
                     db.session.add(new_p)
+                else:
+                    existing.price = price_val
+                    existing.last_updated = datetime.utcnow()
+
+                # Always log price history
+                db.session.add(PriceHistory(
+                    product_id=prod_id,
+                    price=price_val,
+                    store_name=store_name
+                ))
             db.session.commit()
-    except Exception:
+            print(f"[Database] Successfully logged {len(products_list)} products to main database.")
+    except Exception as e:
         db.session.rollback()
+        print(f"[Database Error] Failed to log search results: {e}")
 
 # ==========================================
 # DYNAMIC HEADERS & HARVESTER
@@ -661,13 +772,24 @@ async def scrape_woolworths(query: str, page_size: int = 16):
 # ROUTES & ENDPOINTS
 # ==========================================
 
-# --- Admin API Routes (For React Admin Dashboard) ---
+# --- Admin API Routes ---
 @app.route('/api/admin/stats', methods=['GET'])
 @admin_required
 def api_admin_stats():
+    total_users = User.query.count()
+    active_users = User.query.filter_by(is_active=True).count()
+    total_products = Product.query.count()
+    total_baskets = SavedBasket.query.count()
+    
+    # FIX: Use db.select to avoid conflict with the 'query' column name in SearchHistory
+    total_searches = db.session.scalar(db.select(db.func.count(SearchHistory.id))) or 0
+    
     return jsonify({
-        "usersCount": User.query.count(),
-        "productsCount": Product.query.count(),
+        "usersCount": total_users,
+        "activeUsers": active_users,
+        "productsCount": total_products,
+        "basketsCount": total_baskets,
+        "searchesCount": total_searches,
         "activeScrapers": 4
     })
 
@@ -680,6 +802,7 @@ def api_admin_users():
         "username": u.username,
         "email": u.email,
         "role": "Admin" if u.is_admin else "User",
+        "is_active": u.is_active,
         "joined": u.created_at.strftime('%Y-%m-%d')
     } for u in users])
 
@@ -706,10 +829,13 @@ def api_admin_create_user():
             username=username,
             email=email,
             password_hash=generate_password_hash(password),
-            is_admin=is_admin
+            is_admin=is_admin,
+            is_active=True
         )
         db.session.add(new_user)
         db.session.commit()
+        log_system_event("User Created", f"Admin created user: {username}")
+        
         return jsonify({
             'success': True,
             'user': {
@@ -717,12 +843,26 @@ def api_admin_create_user():
                 'username': new_user.username,
                 'email': new_user.email,
                 'role': 'Admin' if new_user.is_admin else 'User',
+                'is_active': new_user.is_active,
                 'joined': new_user.created_at.strftime('%Y-%m-%d')
             }
         })
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users/<int:user_id>/toggle-status', methods=['POST'])
+@admin_required
+def api_admin_toggle_user_status(user_id):
+    user = db.session.get(User, user_id)
+    if not user: return jsonify({'error': 'User not found'}), 404
+    if user.is_admin: return jsonify({'error': 'Cannot suspend an administrative account.'}), 403
+    
+    user.is_active = not user.is_active
+    db.session.commit()
+    log_system_event("User Status Changed", f"Admin {'activated' if user.is_active else 'suspended'} user: {user.username}")
+    
+    return jsonify({'success': True, 'is_active': user.is_active})
 
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
 @admin_required
@@ -733,8 +873,10 @@ def api_admin_delete_user(user_id):
     if user.is_admin and User.query.filter_by(is_admin=True).count() <= 1:
         return jsonify({'error': 'Cannot delete the last remaining administrator.'}), 400
     
+    username = user.username
     db.session.delete(user)
     db.session.commit()
+    log_system_event("User Deleted", f"Admin deleted user: {username}")
     return jsonify({'success': True})
 
 @app.route('/api/admin/system/trigger-job', methods=['POST'])
@@ -743,6 +885,7 @@ def api_admin_trigger_job():
     store = (request.json or {}).get('store', 'all')
     try:
         threading.Thread(target=refresh_tokens_sync, args=(store,), daemon=True).start()
+        log_system_event("Scraper Triggered", f"Manual trigger for store: {store}")
         return jsonify({'success': True, 'message': f'Scrapers triggered successfully for [{store}].'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -754,20 +897,51 @@ def api_admin_clear_cache():
         if os.path.exists(CACHE_DB_FILE):
             os.remove(CACHE_DB_FILE)
         init_cache_db()
+        log_system_event("Cache Cleared", "Admin manually flushed search cache")
         return jsonify({'success': True, 'message': 'Search cache successfully flushed.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/admin/logs', methods=['GET'])
+@admin_required
+def api_admin_logs():
+    logs = SystemLog.query.order_by(SystemLog.created_at.desc()).limit(50).all()
+    return jsonify([{
+        'id': l.id,
+        'action': l.action,
+        'details': l.details,
+        'date': l.created_at.strftime('%Y-%m-%d %H:%M:%S')
+    } for l in logs])
 
 # --- Standard Routes ---
 @app.route('/favicon.ico')
 def favicon(): return '', 204
 
 @app.route('/api/search', methods=['GET'])
+@check_active_status
 def handle_search():
     query = request.args.get('q', '').strip().lower()
     store_filter = request.args.get('store', 'all').strip().lower()
     sort_option = request.args.get('sort', '').strip().lower()
     if not query: return jsonify([])
+
+    # Log Search to populate SearchHistory with 5-second deduplication guard
+    try:
+        with app.app_context():
+            user_id = session.get('user_id')
+            if user_id:
+                five_seconds_ago = datetime.utcnow() - timedelta(seconds=5)
+                recent_duplicate = db.session.query(SearchHistory).filter(
+                    SearchHistory.__table__.c.query == query,
+                    SearchHistory.user_id == user_id,
+                    SearchHistory.created_at >= five_seconds_ago
+                ).first()
+                
+                if not recent_duplicate:
+                    db.session.add(SearchHistory(user_id=user_id, query=query))
+                    db.session.commit()
+    except Exception:
+        db.session.rollback()
 
     search_queries = [query]
     if query in ['milk', 'dairy']:
@@ -872,7 +1046,7 @@ def user_can_edit_basket(basket_id, user_id):
 
 @app.route('/api/compare', methods=['GET'])
 def compare_product():
-    query = request.args.get('q', '').strip()
+    query = request.args.get('q', '').strip().lower()
     if not query:
         return jsonify({'found': False, 'products': []})
     
@@ -928,6 +1102,25 @@ def batch_compare():
 
 # --- Reviews, Active Cart & Saved Baskets ---
 
+@app.route('/api/analytics/price-history/<path:product_id>', methods=['GET'])
+def get_price_history(product_id):
+    history = PriceHistory.query.filter_by(product_id=product_id).order_by(PriceHistory.recorded_at.asc()).all()
+    if not history:
+        prod = db.session.get(Product, product_id)
+        if not prod:
+            return jsonify([])
+        return jsonify([{
+            'date': prod.last_updated.strftime('%Y-%m-%d'),
+            'price': prod.price,
+            'store': prod.store
+        }])
+        
+    return jsonify([{
+        'date': h.recorded_at.strftime('%Y-%m-%d'),
+        'price': h.price,
+        'store': h.store_name
+    } for h in history])
+
 @app.route('/api/reviews/<path:product_id>', methods=['GET'])
 def get_reviews(product_id):
     reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
@@ -940,6 +1133,7 @@ def get_reviews(product_id):
     } for r in reviews])
 
 @app.route('/api/reviews/<path:product_id>', methods=['POST'])
+@check_active_status
 def add_review(product_id):
     if 'username' not in session or 'user_id' not in session:
         return jsonify({'error': 'Authentication required'}), 401
@@ -982,16 +1176,22 @@ def handle_active_cart():
     elif request.method == 'POST':
         data = request.json or {}
         items = data.get('items', [])
-        cart_record = db.session.get(ActiveCart, user_id)
-        if not cart_record:
-            cart_record = ActiveCart(user_id=user_id, items_json=json.dumps(items))
-            db.session.add(cart_record)
-        else:
-            cart_record.items_json = json.dumps(items)
-        db.session.commit()
-        return jsonify({'authenticated': True, 'success': True})
+        
+        try:
+            cart_record = db.session.get(ActiveCart, user_id)
+            if not cart_record:
+                cart_record = ActiveCart(user_id=user_id, items_json=json.dumps(items))
+                db.session.add(cart_record)
+            else:
+                cart_record.items_json = json.dumps(items)
+            db.session.commit()
+            return jsonify({'authenticated': True, 'success': True, 'message': 'Cart successfully updated.'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'authenticated': True, 'success': False, 'error': str(e)})
 
 @app.route('/api/db/save-basket', methods=['POST'])
+@check_active_status
 def save_basket_to_db():
     user_id = session.get('user_id')
     if not user_id:
@@ -1005,6 +1205,9 @@ def save_basket_to_db():
         return jsonify({'error': 'No items in basket'}), 400
 
     try:
+        sender_name = session.get('username', 'Someone')
+        change_description = f"{sender_name} updated the list."
+
         if basket_id:
             basket = db.session.get(SavedBasket, basket_id)
             if not basket:
@@ -1012,6 +1215,27 @@ def save_basket_to_db():
             if not user_can_edit_basket(basket_id, user_id):
                 return jsonify({'error': 'Unauthorized'}), 403
             
+            old_items_map = {bi.product_id: bi for bi in basket.items}
+            new_items_map = {item['id']: item for item in items}
+
+            added = [item['name'] for pid, item in new_items_map.items() if pid not in old_items_map]
+            removed = [bi.product.name for pid, bi in old_items_map.items() if pid not in new_items_map and bi.product]
+            modified = []
+            for pid, item in new_items_map.items():
+                if pid in old_items_map:
+                    old_qty = old_items_map[pid].quantity
+                    new_qty = item.get('quantity', 1)
+                    if old_qty != new_qty:
+                        modified.append(f"{item['name']} (Qty: {old_qty} ➔ {new_qty})")
+
+            details = []
+            if added: details.append(f"Added: {', '.join(added)}")
+            if removed: details.append(f"Removed: {', '.join(removed)}")
+            if modified: details.append(f"Changed qty: {', '.join(modified)}")
+            
+            if details:
+                change_description = f"{sender_name} " + "; ".join(details) + "."
+
             basket.name = basket_name
             BasketItem.query.filter_by(basket_id=basket.id).delete()
             target_basket_id = basket.id
@@ -1020,12 +1244,14 @@ def save_basket_to_db():
             db.session.add(basket)
             db.session.flush()
             target_basket_id = basket.id
+            change_description = f"{sender_name} created the list with {len(items)} items."
 
         async def get_all_competitors():
             tasks = [internal_fetch_competitors(item['name']) for item in items]
             return await asyncio.gather(*tasks)
         
         competitors_lists = asyncio.run(get_all_competitors())
+        current_total = 0.0
 
         for idx, item in enumerate(items):
             product = db.session.get(Product, item['id'])
@@ -1039,42 +1265,64 @@ def save_basket_to_db():
                 
             comps = [c for c in competitors_lists[idx] if c['id'] != item['id']]
             snapshot_price = float(item['price'])
+            quantity = item.get('quantity', 1)
+            current_total += (snapshot_price * quantity)
+            
             db.session.add(BasketItem(
                 basket_id=target_basket_id, 
                 product_id=item['id'], 
-                quantity=item.get('quantity', 1),
+                quantity=quantity,
                 price=snapshot_price,
                 competitor_prices=json.dumps(comps)
             ))
 
-        if basket.is_collaborative:
-            collabs = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket.id, status='accepted').all()
-            sender_name = session.get('username', 'Someone')
+        # Check Budget Guardrails
+        budget_warning = False
+        user_pref = UserPreference.query.filter_by(user_id=user_id).first()
+        if user_pref and user_pref.monthly_budget and user_pref.monthly_budget > 0:
+            if current_total > user_pref.monthly_budget:
+                budget_warning = True
+
+        has_collaborators = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket.id).count() > 0
+        if basket.is_collaborative or has_collaborators:
+            basket.is_collaborative = True
             
+            db.session.add(BasketActivity(
+                basket_id=basket.id,
+                user_id=user_id,
+                action=change_description
+            ))
+
+            collabs = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket.id, status='accepted').all()
             for c in collabs:
                 if c.user_id != user_id:
                     db.session.add(Notification(
                         recipient_id=c.user_id,
                         sender_id=user_id,
                         basket_id=basket.id,
-                        message=f"{sender_name} updated the collaborative list '{basket.name}'."
+                        message=change_description
                     ))
-            
             if basket.user_id != user_id:
                 db.session.add(Notification(
                     recipient_id=basket.user_id,
                     sender_id=user_id,
                     basket_id=basket.id,
-                    message=f"{sender_name} updated your collaborative list '{basket.name}'."
+                    message=change_description
                 ))
 
         db.session.commit()
-        return jsonify({'success': True, 'basket_id': target_basket_id})
+        return jsonify({
+            'success': True, 
+            'basket_id': target_basket_id,
+            'basket_total': current_total,
+            'budget_warning': budget_warning
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/db/saved-baskets/<int:basket_id>', methods=['DELETE'])
+@check_active_status
 def delete_db_basket(basket_id):
     try:
         b = db.session.get(SavedBasket, basket_id)
@@ -1097,7 +1345,8 @@ def search_system_users():
     users = User.query.filter(
         User.username.ilike(f'%{query}%'), 
         User.id != session['user_id'],
-        User.is_admin == False
+        User.is_admin == False,
+        User.is_active == True
     ).limit(5).all()
     
     return jsonify([{'id': u.id, 'username': u.username} for u in users])
@@ -1115,6 +1364,7 @@ def get_collaborators(basket_id):
     return jsonify(output)
 
 @app.route('/api/saved-baskets/<int:basket_id>/invite', methods=['POST'])
+@check_active_status
 def invite_collaborator(basket_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
@@ -1133,51 +1383,31 @@ def invite_collaborator(basket_id):
         return jsonify({'error': 'You cannot invite yourself'}), 400
         
     target_user = db.session.get(User, target_user_id)
-    if not target_user:
-        return jsonify({'error': 'User not found'}), 404
-        
-    if target_user.is_admin:
-        return jsonify({'error': 'Administrative accounts cannot be invited to lists.'}), 403
+    if not target_user or target_user.is_admin or not target_user.is_active:
+        return jsonify({'error': 'Invalid user account'}), 403
 
-    target_basket = basket
-    if not basket.is_collaborative:
-        collab_basket = SavedBasket(
-            user_id=basket.user_id,
-            name=f"{basket.name} (Collab)",
-            is_collaborative=True
-        )
-        db.session.add(collab_basket)
-        db.session.flush()
-        
-        for item in basket.items:
-            new_item = BasketItem(
-                basket_id=collab_basket.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                price=item.price,
-                competitor_prices=item.competitor_prices
-            )
-            db.session.add(new_item)
-        target_basket = collab_basket
+    basket.is_collaborative = True
+    if not basket.name.endswith("(Collab)"):
+        basket.name = f"{basket.name} (Collab)"
 
-    existing = SavedBasketCollaborator.query.filter_by(saved_basket_id=target_basket.id, user_id=target_user_id).first()
+    existing = SavedBasketCollaborator.query.filter_by(saved_basket_id=basket.id, user_id=target_user_id).first()
     if existing:
         return jsonify({'error': 'User is already invited or a member'}), 400
 
-    collab = SavedBasketCollaborator(saved_basket_id=target_basket.id, user_id=target_user_id, status='pending')
+    collab = SavedBasketCollaborator(saved_basket_id=basket.id, user_id=target_user_id, status='pending')
     db.session.add(collab)
 
     sender_name = session.get('username', 'Someone')
     notif = Notification(
         recipient_id=target_user_id,
         sender_id=session['user_id'],
-        basket_id=target_basket.id,
-        message=f"{sender_name} invited you to collaborate on list: '{target_basket.name}'"
+        basket_id=basket.id,
+        message=f"{sender_name} invited you to collaborate on list: '{basket.name}'"
     )
     db.session.add(notif)
     db.session.commit()
     
-    return jsonify({'success': True, 'basket_id': target_basket.id})
+    return jsonify({'success': True, 'basket_id': basket.id})
 
 @app.route('/api/notifications', methods=['GET'])
 def get_user_notifications():
@@ -1258,10 +1488,18 @@ def get_db_saved_baskets():
     for b in all_collabs:
         inviter_name = b.owner.username if b.owner else 'Someone'
         items_list = [{'id': bi.product.id, 'name': bi.product.name, 'store': bi.product.store, 'price': bi.price or bi.product.price, 'formattedPrice': bi.product.formatted_price, 'imageUrl': bi.product.image_url, 'quantity': bi.quantity} for bi in b.items if bi.product]
+        
+        activities_list = [{
+            'user': {'username': act.user.username if act.user else 'Someone'},
+            'action': act.action,
+            'created_at': act.created_at.strftime('%Y-%m-%d %H:%M')
+        } for act in b.activities]
+
         output.append({
             'id': b.id, 'name': b.name, 'date': b.created_at.strftime('%Y-%m-%d'), 
             'items': items_list, 'is_shared': (b.user_id != user_id), 'is_collab': True,
-            'inviter_name': inviter_name
+            'inviter_name': inviter_name,
+            'activities': activities_list
         })
 
     return jsonify(output)
@@ -1291,40 +1529,8 @@ def mark_all_notifications_as_read():
     db.session.commit()
     return jsonify({'success': True})
 
-@app.route('/api/db/saved-baskets/<int:basket_id>/items', methods=['POST'])
-def add_item_to_saved_basket(basket_id):
-    user_id = session.get('user_id')
-    if not user_can_edit_basket(basket_id, user_id):
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    data = request.json or {}
-    product_id = data.get('id')
-    quantity = int(data.get('quantity', 1))
-    
-    product = db.session.get(Product, product_id)
-    if not product:
-        product = Product(
-            id=product_id, name=data['name'], store=data['store'],
-            price=float(data['price']), formatted_price=data.get('formattedPrice', f"R {float(data['price']):.2f}"),
-            image_url=data.get('imageUrl', '')
-        )
-        db.session.add(product)
-        db.session.commit()
-        
-    existing_item = BasketItem.query.filter_by(basket_id=basket_id, product_id=product_id).first()
-    if existing_item:
-        existing_item.quantity += quantity
-    else:
-        new_item = BasketItem(
-            basket_id=basket_id, product_id=product_id, 
-            quantity=quantity, price=product.price
-        )
-        db.session.add(new_item)
-        
-    db.session.commit()
-    return jsonify({'success': True})
-
 @app.route('/api/db/saved-baskets/<int:basket_id>/items/<path:product_id>', methods=['PATCH', 'DELETE'])
+@check_active_status
 def modify_saved_basket_item(basket_id, product_id):
     user_id = session.get('user_id')
     if not user_can_edit_basket(basket_id, user_id):
@@ -1343,6 +1549,60 @@ def modify_saved_basket_item(basket_id, product_id):
             
     db.session.commit()
     return jsonify({'success': True})
+
+# ==========================================
+# Searching & Trending Routes
+# ==========================================
+
+@app.route('/api/search/history', methods=['GET'])
+def get_search_history():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify([])  # Strictly restrict history dropdown to logged-in users
+    
+    history = db.session.query(SearchHistory).filter_by(user_id=user_id).order_by(SearchHistory.created_at.desc()).limit(15).all()
+    
+    seen = set()
+    unique_history = []
+    for h in history:
+        if h.query.lower() not in seen:
+            seen.add(h.query.lower())
+            unique_history.append({'id': h.id, 'query': h.query})
+            
+    return jsonify(unique_history[:8])
+
+@app.route('/api/search/history/<int:history_id>', methods=['DELETE'])
+def delete_search_history_item(history_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    item = db.session.query(SearchHistory).filter_by(id=history_id, user_id=user_id).first()
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+        
+    return jsonify({'success': True})
+
+@app.route('/api/trending-searches', methods=['GET'])
+def get_trending_searches():
+    try:
+        from sqlalchemy import func
+        query_col = func.lower(SearchHistory.__table__.c.query)
+        
+        # Optional: Limit trending to searches within the last 24 hours for daily trending
+        one_day_ago = datetime.utcnow() - timedelta(days=1)
+        
+        top_searches = db.session.query(
+            query_col, func.count(SearchHistory.id).label('count')
+        ).filter(SearchHistory.created_at >= one_day_ago)\
+         .group_by(query_col)\
+         .order_by(func.count(SearchHistory.id).desc())\
+         .limit(8).all()
+        
+        return jsonify([{'query': item[0], 'count': item[1]} for item in top_searches])
+    except Exception as e:
+        return jsonify([])
 
 # ==========================================
 # HTML FRONTEND ROUTES (Bridged to React)
@@ -1407,6 +1667,9 @@ def login():
         user = User.query.filter_by(email=email).first()
         
         if user and check_password_hash(user.password_hash, password):
+            if not user.is_active:
+                return render_template('login.html', error="Your account has been suspended by an administrator.")
+                
             session['user_id'] = user.id
             session['username'] = user.username
             session['is_admin'] = user.is_admin
@@ -1440,6 +1703,7 @@ def logout():
     """
 
 @app.route('/onboarding', methods=['GET', 'POST'])
+@check_active_status
 def onboarding():
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -1448,12 +1712,15 @@ def onboarding():
     if request.method == 'POST':
         stores = request.form.getlist('preferred_stores')
         stores_str = ",".join(stores) if stores else "Checkers"
+        budget = request.form.get('monthly_budget', 0.0, type=float)
         
         if not user_pref:
-            user_pref = UserPreference(user_id=session['user_id'], preferred_store=stores_str)
+            user_pref = UserPreference(user_id=session['user_id'], preferred_store=stores_str, monthly_budget=budget)
             db.session.add(user_pref)
         else:
             user_pref.preferred_store = stores_str
+            user_pref.monthly_budget = budget
+            
         db.session.commit()
         return redirect('http://localhost:5173/account')
         
@@ -1478,7 +1745,6 @@ def get_popular_products():
             chunk = results[i:i+4]
             query_buckets.append(chunk)
 
-        seen_names = []
         rotated = []
 
         for q_idx, store_chunks in enumerate(query_buckets):
@@ -1503,15 +1769,22 @@ def get_current_user():
     user_id = session.get('user_id')
     if not user_id:
         return jsonify({'authenticated': False}), 200
+        
     user = db.session.get(User, user_id)
-    if not user:
+    if not user or not user.is_active:
+        session.clear()
         return jsonify({'authenticated': False}), 200
+        
+    user_pref = UserPreference.query.filter_by(user_id=user_id).first()
+    budget = user_pref.monthly_budget if user_pref else 0.0
+    
     return jsonify({
         'authenticated': True,
         'id': user.id,
         'username': user.username,
         'email': user.email,
         'is_admin': user.is_admin,
+        'monthly_budget': budget,
         'created_at': user.created_at.strftime('%B %Y')
     })
 

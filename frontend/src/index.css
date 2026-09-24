@@ -5,26 +5,27 @@
 @tailwind utilities;
 
 :root {
-  --primary: #059669;
-  --primary-hover: #047857;
-  --bg-color: #f8fafc;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
+  --primary: #2e7d32;
+  --primary-hover: #1b5e20;
+  --bg-color: #DDFFC8;
+  --text-main: #1f2937;
+  --text-muted: #6b7280;
+  --border-color: #e0e8e1;
   --card-bg: #ffffff;
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
-  --primary-shadcn: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
+
+  --background: 120 14% 96%;
+  --foreground: 220 20% 15%;
+  --border: 125 15% 88%;
+  --input: 125 15% 88%;
+  --ring: 123 46% 34%;
+  --primary-shadcn: 123 46% 34%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 120 20% 93%;
+  --secondary-foreground: 123 46% 20%;
+  --muted: 120 10% 92%;
   --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  --accent: 120 25% 90%;
+  --accent-foreground: 123 46% 20%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
   --radius: 0.5rem;

@@ -8,6 +8,16 @@ export default {
   theme: {
     extend: {
       colors: {
+        smartbasket: {
+          header: "#D4EBD7",       // Mint green top header bar
+          subnav: "#E7F3E8",       // Lighter green category strip
+          bg: "#F4F7F4",           // Soft light page background
+          card: "#FFFFFF",         // Product card surface
+          badge: "#4EAA52",        // Green "Save R20" tag
+          accent: "#2E7D32",       // Deep green buttons/links
+          border: "#E0E8E1",       // Soft card borders
+          muted: "#6B7280",        // Subtext / units
+        },
         emerald: { 50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 500: '#10b981', 600: '#059669', 700: '#047857' },
         brand: { dark: '#1a1c29' },
         border: "hsl(var(--border))",

@@ -51,25 +51,25 @@ function NavigationBar({ cartCount }) {
   };
 
   const getNavLinkClass = ({ isActive }) => 
-    `flex items-center justify-center p-3 rounded-2xl transition-all ${
+    `flex items-center justify-center p-3 rounded-full transition-all ${
       isActive 
-        ? 'bg-emerald-50 text-emerald-600 shadow-sm' 
-        : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-50'
+        ? 'bg-[#bfe0c2] text-[#1b4332] shadow-sm' 
+        : 'text-[#2d5a37] hover:text-[#1b4332] hover:bg-[#cbe6ce]'
     }`;
 
   const getMobileNavLinkClass = ({ isActive }) => 
-    `flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-colors ${
+    `flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-colors ${
       isActive 
-        ? 'bg-emerald-50 text-emerald-700' 
-        : 'text-slate-700 hover:bg-slate-50 hover:text-emerald-600'
+        ? 'bg-[#c2e4c5] text-[#1b4332]' 
+        : 'text-[#2d5a37] hover:bg-[#cbe6ce] hover:text-[#1b4332]'
     }`;
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 transition-all">
+    <nav className="sticky top-0 z-50 bg-[#D4EBD7] border-b border-[#badbbd] px-4 sm:px-8 py-3.5 transition-all">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
         {/* 1. Logo */}
-        <NavLink to="/" className="flex items-center gap-2 text-slate-900 font-black text-xl tracking-tight shrink-0">
+        <NavLink to="/" className="flex items-center gap-2 text-[#1b4332] font-black text-xl tracking-tight shrink-0">
           <span className="text-2xl">🛒</span> 
           <span>SmartBasket</span>
         </NavLink>
@@ -88,7 +88,7 @@ function NavigationBar({ cartCount }) {
           />
           <button 
             type="submit" 
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 flex items-center justify-center transition-colors cursor-pointer"
+            className="bg-[#2E7D32] hover:bg-[#256629] text-white px-5 py-2.5 flex items-center justify-center transition-colors cursor-pointer"
           >
             <Search className="w-4 h-4 stroke-[2.5]" />
           </button>
@@ -111,7 +111,7 @@ function NavigationBar({ cartCount }) {
           <NavLink to="/basket" className={({ isActive }) => `relative ${getNavLinkClass({ isActive })}`} title="My Basket">
             <ShoppingCart className="w-6 h-6 stroke-[2.2]" />
             {cartCount > 0 && (
-              <span className="absolute top-1 right-1 bg-emerald-600 text-white rounded-full text-[10px] font-black px-1.5 py-0.2 border-2 border-white shadow-sm">
+              <span className="absolute top-1 right-1 bg-[#4EAA52] text-white rounded-full text-[10px] font-black px-1.5 py-0.2 border-2 border-[#D4EBD7] shadow-sm">
                 {cartCount}
               </span>
             )}
@@ -133,7 +133,7 @@ function NavigationBar({ cartCount }) {
         {/* 4. Mobile Burger Toggle Button */}
         <button 
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 text-slate-700 hover:text-emerald-600 hover:bg-slate-100 rounded-xl transition-colors focus:outline-none"
+          className="md:hidden p-2 text-[#1b4332] hover:bg-[#c2e4c5] rounded-xl transition-colors focus:outline-none"
           aria-label="Toggle Menu"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -143,8 +143,8 @@ function NavigationBar({ cartCount }) {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden mt-3 pt-3 border-t border-slate-100 flex flex-col gap-4 animate-in slide-in-from-top duration-200 pb-2">
-          <form onSubmit={handleSearchSubmit} className="flex items-center bg-slate-50 border border-slate-200 rounded-full overflow-hidden shadow-sm">
+        <div className="md:hidden mt-3 pt-3 border-t border-[#badbbd] flex flex-col gap-4 animate-in slide-in-from-top duration-200 pb-2">
+          <form onSubmit={handleSearchSubmit} className="flex items-center bg-white border border-[#badbbd] rounded-full overflow-hidden shadow-sm">
             <input
               type="text"
               placeholder="Search for groceries..."
@@ -174,25 +174,25 @@ function NavigationBar({ cartCount }) {
               className={({ isActive }) => `justify-between ${getMobileNavLinkClass({ isActive })}`}
             >
               <div className="flex items-center gap-3">
-                <ShoppingCart className="w-5 h-5 text-emerald-600" /> My Basket
+                <ShoppingCart className="w-5 h-5 text-[#2E7D32]" /> My Basket
               </div>
               {cartCount > 0 && (
-                <span className="bg-emerald-600 text-white rounded-full text-xs font-black px-2.5 py-0.5">
+                <span className="bg-[#4EAA52] text-white rounded-full text-xs font-black px-2.5 py-0.5">
                   {cartCount} items
                 </span>
               )}
             </NavLink>
 
             <NavLink to="/saved" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass}>
-              <Bookmark className="w-5 h-5 text-emerald-600" /> Saved Lists
+              <Bookmark className="w-5 h-5 text-[#2E7D32]" /> Saved Lists
             </NavLink>
 
             <NavLink to="/notifications" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass}>
-              <Bell className="w-5 h-5 text-emerald-600" /> Notifications
+              <Bell className="w-5 h-5 text-[#2E7D32]" /> Notifications
             </NavLink>
 
             <NavLink to="/account" onClick={() => setMobileMenuOpen(false)} className={getMobileNavLinkClass}>
-              <User className="w-5 h-5 text-emerald-600" /> Account Dashboard
+              <User className="w-5 h-5 text-[#2E7D32]" /> Account Dashboard
             </NavLink>
           </div>
         </div>
@@ -239,7 +239,7 @@ export default function App() {
             .skeleton-box { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; background-color: #e2e8f0; }
           `}</style>
 
-          <div className="min-h-screen flex flex-col bg-slate-50">
+          <div className="min-h-screen flex flex-col bg-[#F4F7F4]">
             <NavigationBar cartCount={cartCount} />
 
             <main className="flex-grow">

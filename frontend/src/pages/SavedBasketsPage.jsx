@@ -50,7 +50,7 @@ export default function SavedBasketsPage() {
             return (
               <Card 
                 key={b.id} 
-                className="group border border-slate-200 hover:border-emerald-500/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between rounded-2xl bg-white"
+                className="group border border-slate-200 hover:border-[#FF8C38] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col justify-between rounded-2xl bg-white"
                 onClick={() => navigate(`/saved/${b.id}`)}
               >
                 <CardContent className="p-6 flex flex-col h-full justify-between gap-5">
@@ -58,12 +58,12 @@ export default function SavedBasketsPage() {
                   {/* Header Info */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#FF8C38] bg-[#FFF3EB] px-2.5 py-1 rounded-md">
                         {b.items?.length || 0} {(b.items?.length || 0) === 1 ? 'item' : 'items'}
                       </span>
                       <span className="text-xs font-medium text-slate-400">{b.date}</span>
                     </div>
-                    <h3 className="text-lg font-black text-slate-900 group-hover:text-emerald-600 transition-colors">
+                    <h3 className="text-lg font-black text-slate-900 group-hover:text-[#FF8C38] transition-colors">
                       {b.name}
                     </h3>
                   </div>
@@ -82,7 +82,7 @@ export default function SavedBasketsPage() {
                     ))}
 
                     {overflowCount > 0 && (
-                      <div className="w-14 h-14 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center text-xs font-black shrink-0 shadow-sm">
+                      <div className="w-14 h-14 bg-[#FFF3EB] border border-[#FF8C38] text-[#FF8C38] rounded-xl flex items-center justify-center text-xs font-black shrink-0 shadow-sm">
                         +{overflowCount}
                       </div>
                     )}
@@ -90,10 +90,10 @@ export default function SavedBasketsPage() {
 
                   {/* Footer CTA */}
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-slate-700 group-hover:text-emerald-600 transition-colors">
+                    <span className="text-xs font-extrabold text-slate-700 group-hover:text-[#FF8C38] transition-colors">
                       View Basket Details
                     </span>
-                    <div className="w-8 h-8 rounded-full bg-slate-50 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-colors text-slate-600">
+                    <div className="w-8 h-8 rounded-full bg-[#FFF3EB] group-hover:bg-[#FF8C38] group-hover:text-white flex items-center justify-center transition-colors text-slate-600">
                       <ChevronRight className="w-4 h-4" />
                     </div>
                   </div>

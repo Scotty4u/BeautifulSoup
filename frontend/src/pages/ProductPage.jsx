@@ -11,18 +11,25 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShoppingCart, Star, TrendingDown, ChevronLeft, Package } from 'lucide-react';
 
-// --- Store badge color map ---
-const STORE_COLORS = {
-  'Pick n Pay':  { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200' },
-  'Shoprite':    { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200' },
-  'Checkers':    { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
-  'Woolworths':  { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+import picknpayLogo from '../assets/imgs/picknpay.png';
+import shopriteLogo from '../assets/imgs/shoprite.png';
+import checkersLogo from '../assets/imgs/checkers.png';
+import woolworthsLogo from '../assets/imgs/woolworths.png';
+
+const STORE_INFO = {
+  'Pick n Pay':  { logo: picknpayLogo,   bg: 'bg-white', text: 'text-red-500',    border: 'border-red-200' },
+  'Shoprite':    { logo: shopriteLogo,   bg: 'bg-white', text: 'text-blue-500',   border: 'border-blue-200' },
+  'Checkers':    { logo: checkersLogo,   bg: 'bg-white', text: 'text-amber-500',  border: 'border-amber-200' },
+  'Woolworths':  { logo: woolworthsLogo, bg: 'bg-white', text: 'text-purple-500', border: 'border-purple-200' },
 };
 
 function StoreBadge({ store }) {
-  const colors = STORE_COLORS[store] || { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+  const info = STORE_INFO[store] || { logo: '', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${colors.bg} ${colors.text} ${colors.border}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${info.bg} ${info.text} ${info.border}`}>
+      {info.logo && (
+        <img src={info.logo} alt={`${store} logo`} className="w-6 h-6 object-contain" />
+      )}
       {store}
     </span>
   );
@@ -72,13 +79,24 @@ export default function ProductPage() {
   const [newRating, setNewRating] = useState('5');
   const [submitting, setSubmitting] = useState(false);
 
+  // FIX: Added productId and location.state to the dependency array, 
+  // and reset the state when navigating to a new product.
   useEffect(() => {
-    const productName = product?.name || productId.replace(/^(pnp|shoprite|checkers|woolworths)_/, '').replace(/-/g, ' ');
+    // Reset state for new product view & scroll to top
+    setProduct(location.state?.product || null);
+    setComparison(null);
+    setLoading(!location.state?.product);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const currentProduct = location.state?.product;
+    const productName = currentProduct?.name || productId.replace(/^(pnp|shoprite|checkers|woolworths)_/, '').replace(/-/g, ' ');
 
     axios.get(`/api/compare?q=${encodeURIComponent(productName)}`)
       .then(res => {
         setComparison(res.data);
-        if (!product && res.data?.found && res.data.cheapest) setProduct(res.data.cheapest);
+        if (!currentProduct && res.data?.found && res.data.cheapest) {
+          setProduct(res.data.cheapest);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -93,7 +111,7 @@ export default function ProductPage() {
     axios.get(`/api/reviews/${productId}`)
       .then(res => setReviews(res.data || []))
       .catch(() => {});
-  }, [productId]);
+  }, [productId, location.state?.product]);
 
   const handleReviewSubmit = (e) => {
     e.preventDefault();
