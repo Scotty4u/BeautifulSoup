@@ -6,6 +6,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Testing caches
+.pytest_cache/
+
 # Virtual environments
 .venv/
 venv/
@@ -24,16 +27,14 @@ ENV/
 databases/
 
 # ============================================================
-# Scraper output
-# ============================================================
-
-rendered_shoprite.html
-
-# ============================================================
-# Logs
+# Logs (System & Package Managers)
 # ============================================================
 
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # ============================================================
 # IDE / Editors
@@ -65,5 +66,8 @@ desktop.ini
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
+frontend/build/
 frontend/output/
-.vite/
+frontend/.vite/
+frontend/coverage/
+.eslintcache
