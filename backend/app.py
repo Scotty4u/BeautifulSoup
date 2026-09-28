@@ -280,8 +280,10 @@ def seed_database():
     print("Database seeding completed: Stores and Categories populated.")
 
 with app.app_context():
-    db.create_all()
-    seed_database()
+    db.create_all() # This creates the database file automatically if it doesn't exist
+    seed_database() # This adds the stores and categories
+    
+    # 1. Create Default Admin
     if not User.query.filter_by(is_admin=True).first():
         default_admin = User(
             username='SystemAdmin',
@@ -293,6 +295,16 @@ with app.app_context():
         db.session.add(default_admin)
         db.session.commit()
         print("Default admin account created: admin@smartbasket.local | Password: admin123")
+
+    # 2. AUTOMATIC FIRST-RUN TRIGGER
+    if Product.query.count() == 0:
+        print("⚠️ Empty database detected (First Run). Triggering background seeder...")
+        import threading
+        from seeder import seed_initial_data
+        
+        # We start the seeder in a background thread so the Flask server 
+        # doesn't freeze and wait 60 seconds before letting you log in.
+        threading.Thread(target=seed_initial_data, daemon=True).start()
 
 def log_system_event(action: str, details: str = None):
     try:
@@ -1315,7 +1327,8 @@ def save_basket_to_db():
             'success': True, 
             'basket_id': target_basket_id,
             'basket_total': current_total,
-            'budget_warning': budget_warning
+            'budget_warning': budget_warning,
+            'share_token': basket.share_token
         })
     except Exception as e:
         db.session.rollback()
@@ -1483,7 +1496,15 @@ def get_db_saved_baskets():
 
     for b in owned_personal:
         items_list = [{'id': bi.product.id, 'name': bi.product.name, 'store': bi.product.store, 'price': bi.price or bi.product.price, 'formattedPrice': bi.product.formatted_price, 'imageUrl': bi.product.image_url, 'quantity': bi.quantity} for bi in b.items if bi.product]
-        output.append({'id': b.id, 'name': b.name, 'date': b.created_at.strftime('%Y-%m-%d'), 'items': items_list, 'is_shared': False, 'is_collab': False})
+        output.append({
+            'id': b.id, 
+            'name': b.name, 
+            'date': b.created_at.strftime('%Y-%m-%d'), 
+            'items': items_list, 
+            'is_shared': False, 
+            'is_collab': False,
+            'share_token': b.share_token
+        })
 
     for b in all_collabs:
         inviter_name = b.owner.username if b.owner else 'Someone'
@@ -1496,10 +1517,15 @@ def get_db_saved_baskets():
         } for act in b.activities]
 
         output.append({
-            'id': b.id, 'name': b.name, 'date': b.created_at.strftime('%Y-%m-%d'), 
-            'items': items_list, 'is_shared': (b.user_id != user_id), 'is_collab': True,
+            'id': b.id, 
+            'name': b.name, 
+            'date': b.created_at.strftime('%Y-%m-%d'), 
+            'items': items_list, 
+            'is_shared': (b.user_id != user_id), 
+            'is_collab': True,
             'inviter_name': inviter_name,
-            'activities': activities_list
+            'activities': activities_list,
+            'share_token': b.share_token
         })
 
     return jsonify(output)
@@ -1584,6 +1610,31 @@ def delete_search_history_item(history_id):
         
     return jsonify({'success': True})
 
+@app.route('/api/category/<path:category_name>', methods=['GET'])
+def get_products_by_category(category_name):
+    """Fetches all products belonging to a specific category from the database."""
+    category_name_clean = category_name.strip().lower()
+    
+    # Find category case-insensitively
+    category = Category.query.filter(Category.name.ilike(f"%{category_name_clean}%")).first()
+    
+    if not category:
+        # Fallback if category name doesn't match exactly
+        products = Product.query.filter(Product.name.ilike(f"%{category_name_clean}%")).limit(20).all()
+    else:
+        products = Product.query.filter_by(category_id=category.id).all()
+        
+    results = [{
+        'id': p.id,
+        'name': p.name,
+        'store': p.store,
+        'price': p.price,
+        'formattedPrice': p.formatted_price or f"R {p.price:.2f}",
+        'imageUrl': p.image_url
+    } for p in products]
+    
+    return jsonify(results)
+
 @app.route('/api/trending-searches', methods=['GET'])
 def get_trending_searches():
     try:
@@ -1659,6 +1710,27 @@ def signup():
         """
     return render_template('signup.html')
 
+@app.route('/api/shared/basket/<token>', methods=['GET'])
+def api_public_shared_basket(token):
+    basket = SavedBasket.query.filter_by(share_token=token).first_or_404()
+    items_list = [{
+        'id': bi.product.id,
+        'name': bi.product.name,
+        'store': bi.product.store,
+        'price': bi.price or bi.product.price,
+        'formattedPrice': bi.product.formatted_price,
+        'imageUrl': bi.product.image_url,
+        'quantity': bi.quantity
+    } for bi in basket.items if bi.product]
+    
+    return jsonify({
+        'id': basket.id,
+        'name': basket.name,
+        'owner': basket.owner.username if basket.owner else 'Someone',
+        'date': basket.created_at.strftime('%Y-%m-%d'),
+        'items': items_list
+    })
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -1728,7 +1800,34 @@ def onboarding():
 
 @app.route('/api/popular', methods=['GET'])
 def get_popular_products():
-    popular_queries = ['milk', 'bread', 'eggs', 'chicken', 'rice', 'sugar', 'cooking oil', 'juice']
+    """Fetches popular everyday items from the local database instantly, 
+    falling back to live scraping only if necessary."""
+    try:
+        with app.app_context():
+            # Grab a mix of products from our seeded everyday categories/queries
+            popular_items = Product.query.order_by(Product.last_updated.desc()).limit(24).all()
+            
+            if popular_items:
+                results = []
+                seen_ids = set()
+                for p in popular_items:
+                    if p.id not in seen_ids:
+                        seen_ids.add(p.id)
+                        results.append({
+                            'id': p.id,
+                            'name': p.name,
+                            'store': p.store,
+                            'price': p.price,
+                            'formattedPrice': p.formatted_price or f"R {p.price:.2f}",
+                            'imageUrl': p.image_url
+                        })
+                if results:
+                    return jsonify(results)
+    except Exception as e:
+        print(f"[Popular Route Error] Falling back to live fetch: {e}")
+
+    # Fallback to your original live rotation logic if DB is empty
+    popular_queries = ['milk', 'bread', 'eggs', 'chicken', 'rice', 'sugar', 'cooking oil', 'juice', 'butter', 'cheese']
 
     async def fetch_popular():
         tasks = []
@@ -1739,54 +1838,17 @@ def get_popular_products():
             tasks.append(scrape_woolworths(q, page_size=2))
 
         results = await asyncio.gather(*tasks)
-
-        query_buckets = []
-        for i in range(0, len(results), 4):
-            chunk = results[i:i+4]
-            query_buckets.append(chunk)
-
         rotated = []
-
-        for q_idx, store_chunks in enumerate(query_buckets):
-            store_idx = q_idx % 4
-            ordered_chunks = store_chunks[store_idx:] + store_chunks[:store_idx]
-            for store_results in ordered_chunks:
-                for p in store_results:
-                    pid = p.get('id', '')
-                    name = p.get('name', '')
-                    if p.get('price', 0) > 0 and pid not in [x['id'] for x in rotated]:
-                        if not any(fuzz.token_set_ratio(name.lower(), x['name'].lower()) > 75 for x in rotated):
-                            rotated.append(p)
-                            break
-
+        for store_results in results:
+            for p in store_results:
+                pid = p.get('id', '')
+                if p.get('price', 0) > 0 and pid not in [x['id'] for x in rotated]:
+                    rotated.append(p)
+                    break
         return rotated[:24]
 
     products = asyncio.run(fetch_popular())
     return jsonify(products)
-
-@app.route('/api/me', methods=['GET'])
-def get_current_user():
-    user_id = session.get('user_id')
-    if not user_id:
-        return jsonify({'authenticated': False}), 200
-        
-    user = db.session.get(User, user_id)
-    if not user or not user.is_active:
-        session.clear()
-        return jsonify({'authenticated': False}), 200
-        
-    user_pref = UserPreference.query.filter_by(user_id=user_id).first()
-    budget = user_pref.monthly_budget if user_pref else 0.0
-    
-    return jsonify({
-        'authenticated': True,
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'is_admin': user.is_admin,
-        'monthly_budget': budget,
-        'created_at': user.created_at.strftime('%B %Y')
-    })
 
 # ==========================================
 # APP STARTUP

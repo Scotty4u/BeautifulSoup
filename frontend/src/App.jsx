@@ -29,6 +29,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import AccountPage from './pages/AccountPage';
 import OnboardingPage from './pages/OnboardingPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import SharedBasketPage from './pages/SharedBasketPage';
 
 // --- GLOBAL AXIOS CONFIG ---
 axios.defaults.withCredentials = true;
@@ -254,6 +255,7 @@ export default function App() {
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/account" element={<AccountPage />} />
                 <Route path="/onboarding" element={<OnboardingPage />} />
+                <Route path="/shared/basket/:token" element={<SharedBasketPage />} />
                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               </Routes>
             </main>

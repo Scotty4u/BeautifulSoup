@@ -94,8 +94,8 @@ export default function BasketPage() {
             id: itemId,
             name: itemName,
             imageUrl: itemImage,
-            price: itemPrice, // <-- Overwrite with the specific shop's price
-            store: store,     // <-- Overwrite with the specific shop's name
+            price: itemPrice,
+            store: store,
             calculatedPrice: itemPrice,
             storeMatch: !!storeMatch
           };
@@ -129,6 +129,31 @@ export default function BasketPage() {
         setIsSaving(false);
       })
       .catch(() => showToast("Please log in to save baskets to your profile.", "error"));
+  };
+
+  // Automatically saves/syncs the cart to the backend first to generate a token, then copies link
+  const handleShareLink = async () => {
+    try {
+      const response = await axios.post('/api/db/save-basket', { 
+        name: listName.trim() || 'My Shared Shopping List', 
+        items 
+      });
+
+      const shareToken = response.data.share_token;
+      if (!shareToken) {
+        throw new Error('Share token missing from response');
+      }
+
+      const shareUrl = `${window.location.origin}/shared/basket/${shareToken}`;
+      await navigator.clipboard.writeText(shareUrl);
+      showToast("Share link copied to clipboard!");
+    } catch (err) {
+      if (err.response && err.response.status === 401) {
+        showToast("Please log in to your account to share lists.", "error");
+      } else {
+        showToast("Failed to generate share link. Please try again.", "error");
+      }
+    }
   };
 
   // Metrics
@@ -165,12 +190,9 @@ export default function BasketPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* ========================================================= */}
-      {/* VIEW 1: MY SHOPPING LIST (shopping-list-page)              */}
-      {/* ========================================================= */}
+      {/* VIEW 1: MY SHOPPING LIST */}
       {viewMode === 'list' && (
         <div>
-          {/* Header Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">My Shopping List</h1>
@@ -188,7 +210,7 @@ export default function BasketPage() {
                 Export
               </button>
               <button 
-                onClick={() => showToast("Share link copied to clipboard!")}
+                onClick={handleShareLink}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#E0E8E1] text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm"
               >
                 <Share2 className="w-3.5 h-3.5" />
@@ -205,7 +227,6 @@ export default function BasketPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            {/* Left Items Column */}
             <div className="lg:col-span-2 flex flex-col gap-3">
               {items.map(item => (
                 <div 
@@ -237,7 +258,6 @@ export default function BasketPage() {
                   </div>
 
                   <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-                    {/* Green Pill Counter */}
                     <div className="flex items-center bg-[#2E7D32] text-white rounded-lg p-0.5 shadow-sm">
                       <button 
                         onClick={() => updateQty(item.id, -1)} 
@@ -271,7 +291,6 @@ export default function BasketPage() {
               ))}
             </div>
 
-            {/* Right: List Stats Card */}
             <div className="bg-white rounded-2xl border border-[#E0E8E1] p-6 shadow-sm flex flex-col gap-5">
               <div>
                 <h3 className="text-base font-black text-slate-900">List Stats</h3>
@@ -334,9 +353,7 @@ export default function BasketPage() {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* VIEW 2: BASKET COMPARISON (basket-comparison desktop)     */}
-      {/* ========================================================= */}
+      {/* VIEW 2: BASKET COMPARISON */}
       {viewMode === 'comparison' && (
         <div>
           <div className="flex items-center gap-3 mb-6">
@@ -355,7 +372,6 @@ export default function BasketPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            {/* Left Accordion Stores Breakdown */}
             <div className="lg:col-span-2 flex flex-col gap-4">
               {loadingComparison ? (
                 <div className="bg-white rounded-2xl border border-[#2E7D32] p-8 text-center text-slate-500 font-medium">
@@ -373,7 +389,6 @@ export default function BasketPage() {
                         isBest ? 'border-[#2E7D32] ring-1 ring-[#2E7D32] shadow-sm' : 'border-[#E0E8E1]'
                       }`}
                     >
-                      {/* Accordion Header */}
                       <div 
                         onClick={() => toggleStoreExpansion(st.store)}
                         className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 select-none"
@@ -396,7 +411,6 @@ export default function BasketPage() {
                         </div>
                       </div>
 
-                      {/* Accordion Content */}
                       {isExpanded && (
                         <div className="px-4 pb-4 pt-1 border-t border-slate-100 flex flex-col gap-2.5 bg-slate-50/40">
                           {st.items.map(item => (
@@ -431,7 +445,6 @@ export default function BasketPage() {
               )}
             </div>
 
-            {/* Right: Best Deal Result Card */}
             <div className="bg-white rounded-2xl border border-[#E0E8E1] p-6 shadow-sm flex flex-col gap-5">
               <div>
                 <h3 className="text-base font-black text-slate-900">Best Deal Result</h3>
@@ -452,7 +465,6 @@ export default function BasketPage() {
                 </div>
               )}
 
-              {/* Retailer cost breakdown rows */}
               <div className="space-y-2 border-b border-slate-100 pb-4 text-xs">
                 {storeTotals.slice(0, 3).map(st => (
                   <div key={st.store} className="flex justify-between text-slate-600">
@@ -477,7 +489,7 @@ export default function BasketPage() {
               </button>
 
               <button 
-                onClick={() => showToast("Comparison link copied to clipboard!")}
+                onClick={handleShareLink}
                 className="w-full py-2.5 rounded-xl border border-[#E0E8E1] text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Share2 className="w-3.5 h-3.5" />

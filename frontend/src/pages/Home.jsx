@@ -20,7 +20,14 @@ const STORE_INFO = {
   'Woolworths':  { logo: woolworthsLogo, bg: 'bg-white', text: 'text-purple-500', border: 'border-purple-200' },
 };
 
-const ALL_CATEGORIES = ['Grocery', 'Liquor', 'Pharmacy', 'Electronics'];
+const ALL_CATEGORIES = [
+  'Dairy & Fresh Milk', 
+  'Fruits & Juices', 
+  'Pantry Staples', 
+  'Bakery & Breads', 
+  'Snacks & Treats', 
+  'Meat & Poultry'
+];
 
 function StoreBadge({ store }) {
   const info = STORE_INFO[store] || { logo: '', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
@@ -56,8 +63,6 @@ export default function Home() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const categories = ['Grocery', 'Liquor', 'Pharmacy', 'Electronics'];
-
   useEffect(() => {
     axios.get('/api/popular')
       .then(res => { setProducts(res.data || []); setLoading(false); })
@@ -69,12 +74,12 @@ export default function Home() {
       
       {/* ── 1. CATEGORY TOGGLE BAR ── */}
       <div className="bg-[#E7F3E8] border-b border-slate-200 py-3 mb-8 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 flex justify-center items-center gap-8 md:gap-14 overflow-x-auto">
-          {categories.map((cat) => (
+        <div className="max-w-6xl mx-auto px-4 flex justify-center items-center gap-6 md:gap-10 overflow-x-auto">
+          {ALL_CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => navigate(`/search?category=${encodeURIComponent(cat.toLowerCase())}`, {
-                state: {selectedCategories: [cat]}
+                state: { selectedCategories: [cat] }
               })}
               className="text-sm font-semibold text-slate-700 hover:text-[#FF8C38] transition-colors whitespace-nowrap cursor-pointer"
             >
@@ -86,7 +91,7 @@ export default function Home() {
 
       <div className="max-w-6xl mx-auto px-4 space-y-12">
 
-        {/* ── 2. HERO SECTION: ORANGE PROMO CARD + SHOPPING CART CARD ── */}
+        {/* ── 2. HERO SECTION ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
           {/* Left: Orange Daily Deals Card */}
@@ -101,8 +106,7 @@ export default function Home() {
               <p className="text-white/90 text-sm leading-relaxed pt-2">
                 SmartBasket makes grocery shopping simple, fast, and affordable.
                 Browse fresh produce, pantry essentials, beverages, and household
-                items all in one place, with quality products and great daily deals
-                delivered right to your doorstep.
+                items all in one place.
               </p>
             </div>
 
@@ -147,7 +151,7 @@ export default function Home() {
                   onClick={() => navigate('/search?q=all', { state: { selectedCategories: ALL_CATEGORIES } })}
                   className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  1245+ items <ArrowRight className="w-3.5 h-3.5" />
+                  Browse all items <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
