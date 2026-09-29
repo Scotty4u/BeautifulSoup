@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow space-y-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-800 gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">Collaborative Workspace 🤝</h1>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Manage and view your shared grocery lists with your team or family.</p>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <a href="/" class="px-4 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition flex items-center gap-2 cursor-pointer shadow-sm">
+                Start Shopping
+            </a>
+        </div>
+    </div>
+
+    <!-- TABS & ACTION BAR -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="flex items-center space-x-2">
+            <a href="/saved" id="tab-btn-personal" class="px-4 py-2 rounded-xl text-xs font-black bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition cursor-pointer">Saved Baskets</a>
+            <a href="/collaborative" id="tab-btn-collab" class="px-4 py-2 rounded-xl text-xs font-black bg-brand-dark dark:bg-emerald-600 text-white shadow-sm transition cursor-pointer">Collaborative Lists</a>
+        </div>
+        
+        <a href="/" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition cursor-pointer">
+            <span class="text-sm font-black">+</span> New Collaborative List
+        </a>
+    </div>
+
+    <!-- MAIN GRID CONTAINER -->
+    <div id="collab-baskets-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="col-span-full flex justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
