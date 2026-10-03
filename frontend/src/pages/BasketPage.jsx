@@ -171,7 +171,7 @@ export default function BasketPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center">
         <div className="bg-white rounded-3xl border border-[#E0E8E1] p-12 shadow-sm">
-          <div className="w-16 h-16 bg-[#E7F3E8] rounded-full flex items-center justify-center mx-auto mb-4 text-[#2E7D32]">
+          <div className="w-16 h-16 bg-[#FFF3EB] rounded-full flex items-center justify-center mx-auto mb-4 text-[#FF8C38]">
             <Store className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-bold text-slate-800">Your basket is empty</h2>
@@ -179,7 +179,7 @@ export default function BasketPage() {
             Explore items across retailers and compare real-time prices to find the best savings.
           </p>
           <Link to="/search">
-            <Button className="mt-6 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-xl px-6">
+            <Button className="mt-6 bg-[#FF8C38] hover:brightness-95 text-white font-bold rounded-xl px-6">
               Start Shopping
             </Button>
           </Link>
@@ -247,18 +247,18 @@ export default function BasketPage() {
                     <div className="min-w-0">
                       <h4 
                         onClick={() => navigate(`/product/${item.id}`, { state: { product: item } })}
-                        className="text-sm font-bold text-slate-800 truncate cursor-pointer hover:text-[#2E7D32] transition-colors"
+                        className="text-sm font-bold text-slate-800 truncate cursor-pointer hover:text-[#FF8C38] transition-colors"
                       >
                         {item.name}
                       </h4>
-                      <span className="inline-block text-[10px] font-bold text-[#2E7D32] bg-[#E7F3E8] px-2 py-0.5 rounded mt-1">
+                      <span className="inline-block text-[10px] font-bold text-[#FF8C38] bg-[#FFF3EB] px-2 py-0.5 rounded mt-1">
                         {item.store}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-                    <div className="flex items-center bg-[#2E7D32] text-white rounded-lg p-0.5 shadow-sm">
+                    <div className="flex items-center bg-[#FF8C38] text-white rounded-lg p-0.5 shadow-sm">
                       <button 
                         onClick={() => updateQty(item.id, -1)} 
                         className="w-6 h-6 flex items-center justify-center hover:bg-black/10 rounded font-bold text-sm cursor-pointer"
@@ -310,7 +310,7 @@ export default function BasketPage() {
 
               <div className="flex justify-between items-baseline">
                 <span className="text-xs font-bold text-slate-700">Estimated Total</span>
-                <span className="text-xl font-black text-[#2E7D32]">
+                <span className="text-xl font-black text-[#FF8C38]">
                   R {estimatedTotal.toFixed(2)}
                 </span>
               </div>
@@ -321,7 +321,7 @@ export default function BasketPage() {
 
               <button 
                 onClick={() => setViewMode('comparison')}
-                className="w-full py-3 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white font-bold text-sm transition-colors shadow-sm cursor-pointer"
+                className="w-full py-3 rounded-xl bg-[#FF8C38] hover:brightness-95 text-white font-bold text-sm transition-colors shadow-sm cursor-pointer"
               >
                 Compare Retailer Prices →
               </button>
@@ -343,7 +343,7 @@ export default function BasketPage() {
                     className="w-full text-xs p-2 rounded-lg border border-[#E0E8E1] bg-[#F4F7F4] focus:outline-none"
                     autoFocus
                   />
-                  <button type="submit" className="w-full py-2 bg-[#2E7D32] hover:bg-[#256629] text-white rounded-lg text-xs font-bold transition-colors">
+                  <button type="submit" className="w-full py-2 bg-[#FF8C38] hover:brightness-95 text-white rounded-lg text-xs font-bold transition-colors">
                     Confirm Save
                   </button>
                 </form>
@@ -374,7 +374,7 @@ export default function BasketPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 flex flex-col gap-4">
               {loadingComparison ? (
-                <div className="bg-white rounded-2xl border border-[#2E7D32] p-8 text-center text-slate-500 font-medium">
+                <div className="bg-white rounded-2xl border border-[#FF8C38] p-8 text-center text-slate-500 font-medium">
                   Calculating real-time comparison across Shoprite, Checkers, Woolworths, and Pick n Pay...
                 </div>
               ) : (
@@ -386,7 +386,7 @@ export default function BasketPage() {
                     <div 
                       key={st.store} 
                       className={`bg-white rounded-2xl border transition-all overflow-hidden ${
-                        isBest ? 'border-[#2E7D32] ring-1 ring-[#2E7D32] shadow-sm' : 'border-[#E0E8E1]'
+                        isBest ? 'border-[#FF8C38] ring-1 ring-[#FF8C38] shadow-sm' : 'border-[#E0E8E1]'
                       }`}
                     >
                       <div 
@@ -394,10 +394,10 @@ export default function BasketPage() {
                         className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 select-none"
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`w-2.5 h-2.5 rounded-full ${isBest ? 'bg-[#2E7D32]' : 'bg-slate-300'}`} />
+                          <span className={`w-2.5 h-2.5 rounded-full ${isBest ? 'bg-[#FF8C38]' : 'bg-slate-300'}`} />
                           <span className="font-extrabold text-sm text-slate-800">{st.store}</span>
                           {isBest && (
-                            <span className="text-[10px] font-bold text-[#2E7D32] bg-[#E7F3E8] px-2 py-0.5 rounded">
+                            <span className="text-[10px] font-bold text-[#FF8C38] bg-[#FFF3EB] px-2 py-0.5 rounded">
                               CHEAPEST
                             </span>
                           )}
@@ -428,7 +428,7 @@ export default function BasketPage() {
                                   />
                                 </div>
                                 <div>
-                                  <span className="font-semibold text-slate-800 hover:text-[#2E7D32] transition-colors">{item.name}</span>
+                                  <span className="font-semibold text-slate-800 hover:text-[#FF8C38] transition-colors">{item.name}</span>
                                   <span className="text-slate-400 ml-2">Qty: {item.quantity || 1}</span>
                                 </div>
                               </div>
@@ -452,14 +452,14 @@ export default function BasketPage() {
               </div>
 
               {cheapestStore && (
-                <div className="bg-[#E7F3E8] border border-[#2E7D32] p-4 rounded-xl flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-[#2E7D32] shrink-0 mt-0.5" />
+                <div className="bg-[#FFF3EB] border border-[#FF8C38]/40 p-4 rounded-xl flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-[#FF8C38] shrink-0 mt-0.5" />
                   <div className="text-xs">
-                    <p className="font-bold text-[#2E7D32]">
+                    <p className="font-bold text-[#FF8C38]">
                       {cheapestStore.store} is Cheaper!
                     </p>
                     <p className="text-slate-600 mt-0.5 leading-relaxed">
-                      You save <strong className="text-[#2E7D32]">R {potentialSavings.toFixed(2)}</strong> by choosing to shop your basket at {cheapestStore.store}.
+                      You save <strong className="text-[#FF8C38]">R {potentialSavings.toFixed(2)}</strong> by choosing to shop your basket at {cheapestStore.store}.
                     </p>
                   </div>
                 </div>
@@ -476,14 +476,14 @@ export default function BasketPage() {
 
               <div className="flex justify-between items-baseline">
                 <span className="text-xs font-bold text-slate-700">Best Basket Price</span>
-                <span className="text-xl font-black text-[#2E7D32]">
+                <span className="text-xl font-black text-[#FF8C38]">
                   {cheapestStore ? `R ${cheapestStore.total.toFixed(2)}` : 'R 0.00'}
                 </span>
               </div>
 
               <button 
                 onClick={() => showToast(`Selected ${cheapestStore?.store || 'store'}! Saving order...`)}
-                className="w-full py-3 rounded-xl bg-[#2E7D32] hover:bg-[#256629] text-white font-bold text-sm transition-colors shadow-sm cursor-pointer"
+                className="w-full py-3 rounded-xl bg-[#FF8C38] hover:brightness-95 text-white font-bold text-sm transition-colors shadow-sm cursor-pointer"
               >
                 Save & Go To Store →
               </button>

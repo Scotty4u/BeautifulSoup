@@ -16,7 +16,7 @@ const STORE_COLORS = {
 };
 
 function StoreBadge({ store }) {
-  const colors = STORE_COLORS[store] || { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
+  const colors = STORE_COLORS[store] || { bg: 'bg-[#FFF3EB]', text: 'text-[#FF8C38]', border: 'border-[#FF8C38]/30' };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider border ${colors.bg} ${colors.text} ${colors.border}`}>
       {store}
@@ -140,7 +140,7 @@ export default function SavedBasketDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-16 text-center">
         <h2 className="text-xl font-black text-slate-800">Basket not found</h2>
         <p className="text-slate-500 text-sm mt-1">This list may have been deleted or doesn't exist.</p>
-        <Button onClick={() => navigate('/saved')} className="mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl">
+        <Button onClick={() => navigate('/saved')} className="mt-6 bg-[#FF8C38] hover:brightness-95 text-white font-bold rounded-xl">
           Back to Saved Lists
         </Button>
       </div>
@@ -156,7 +156,7 @@ export default function SavedBasketDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl px-6 py-4 shadow-sm">
         <button
           onClick={() => navigate('/saved')}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-emerald-600 transition-colors font-semibold"
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#FF8C38] transition-colors font-semibold"
         >
           <ChevronLeft className="w-4 h-4" />
           Back to Saved Lists
@@ -171,7 +171,7 @@ export default function SavedBasketDetailPage() {
               collaborators.map((c, i) => (
                 <div 
                   key={c.id || i} 
-                  className="w-8 h-8 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-xs uppercase"
+                  className="w-8 h-8 rounded-full bg-[#FF8C38] text-white font-black text-xs flex items-center justify-center border-2 border-white shadow-xs uppercase"
                   title={c.username}
                 >
                   {c.username ? c.username.slice(0, 2) : 'U'}
@@ -183,7 +183,7 @@ export default function SavedBasketDetailPage() {
           <Button 
             onClick={() => setShowInviteModal(true)} 
             size="sm"
-            className="bg-slate-900 hover:bg-emerald-600 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-xs transition-colors flex items-center gap-1 ml-2"
+            className="bg-slate-900 hover:bg-[#FF8C38] text-white font-bold text-xs h-8 px-3 rounded-xl shadow-xs transition-colors flex items-center gap-1 ml-2"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Person
           </Button>
@@ -192,22 +192,22 @@ export default function SavedBasketDetailPage() {
 
       {/* Basket Title Info */}
       <div>
-        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md">Saved List</span>
+        <span className="text-xs font-bold text-[#FF8C38] bg-[#FFF3EB] px-2.5 py-1 rounded-md">Saved List</span>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight mt-2">{basket.name}</h1>
         <p className="text-xs text-slate-400 font-medium mt-0.5">Created on {basket.date}</p>
       </div>
 
       {/* TOP DYNAMIC CHEAPEST SHOP BANNER (Matching BasketPage) */}
       {basket.items?.length > 0 && (
-        <div className="flex justify-between items-center bg-emerald-50/80 px-6 py-4 rounded-2xl border border-emerald-500/60 shadow-xs">
+        <div className="flex justify-between items-center bg-[#FFF3EB] px-6 py-4 rounded-2xl border border-[#FF8C38]/40 shadow-xs">
           <div>
-            <span className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider">Best Total Price</span>
+            <span className="text-[11px] font-extrabold text-[#FF8C38] uppercase tracking-wider">Best Total Price</span>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <h3 className="m-0 font-black text-xl text-emerald-950">
+              <h3 className="m-0 font-black text-xl text-[#FF8C38]">
                 {loadingComparison ? 'Calculating...' : cheapestStore ? cheapestStore.store : 'Analyzing...'}
               </h3>
               {!loadingComparison && cheapestStore && (
-                <span className="font-extrabold text-lg text-emerald-700">
+                <span className="font-extrabold text-lg text-[#FF8C38]">
                   R {cheapestStore.total.toFixed(2)}
                 </span>
               )}
@@ -225,7 +225,7 @@ export default function SavedBasketDetailPage() {
 
           <div className="space-y-3">
             {basket.items.map(item => (
-              <Card key={item.id} className="border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:border-emerald-300 transition-all">
+              <Card key={item.id} className="border border-slate-200/80 rounded-2xl bg-white shadow-xs hover:border-[#FF8C38] transition-all">
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div 
                     className="flex items-center gap-3.5 cursor-pointer flex-grow min-w-0"
@@ -276,7 +276,7 @@ export default function SavedBasketDetailPage() {
                       key={st.store} 
                       className={`rounded-2xl border transition-all overflow-hidden ${
                         isCheapest 
-                          ? 'bg-emerald-50/40 border-emerald-500/60 shadow-sm' 
+                          ? 'bg-[#FFF3EB] border-[#FF8C38]/40 shadow-sm'
                           : 'bg-slate-50/50 border-slate-200'
                       }`}
                     >
@@ -287,11 +287,11 @@ export default function SavedBasketDetailPage() {
                       >
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className={`font-extrabold text-sm ${isCheapest ? 'text-emerald-900' : 'text-slate-800'}`}>
+                            <span className={`font-extrabold text-sm ${isCheapest ? 'text-[#FF8C38]' : 'text-slate-800'}`}>
                               {st.store}
                             </span>
                             {isCheapest && (
-                              <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-md font-black tracking-wider uppercase">
+                              <span className="text-[10px] bg-[#FF8C38] text-white px-2 py-0.5 rounded-md font-black tracking-wider uppercase">
                                 Cheapest
                               </span>
                             )}
@@ -302,7 +302,7 @@ export default function SavedBasketDetailPage() {
                         </div>
                         
                         <div className="flex items-center gap-3">
-                          <span className={`font-black text-base ${isCheapest ? 'text-emerald-700' : 'text-slate-900'}`}>
+                          <span className={`font-black text-base ${isCheapest ? 'text-[#FF8C38]' : 'text-slate-900'}`}>
                             R {st.total.toFixed(2)}
                           </span>
                           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
@@ -316,7 +316,7 @@ export default function SavedBasketDetailPage() {
                             <div 
                               key={item.id} 
                               onClick={() => navigate(`/product/${item.id}`, { state: { product: { ...item, store: st.store, price: item.calculatedPrice } } })}
-                              className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200/80 cursor-pointer hover:border-emerald-400 transition-all shadow-2xs"
+                              className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200/80 cursor-pointer hover:border-[#FF8C38] transition-all shadow-2xs"
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <img 
@@ -326,7 +326,7 @@ export default function SavedBasketDetailPage() {
                                 />
                                 <div className="min-w-0">
                                   <h5 className="text-xs font-bold text-slate-800 truncate">{item.name}</h5>
-                                  <span className="text-[10px] text-slate-400">Qty: {item.quantity || 1} &bull; <strong className="text-emerald-600">{st.store}</strong></span>
+                                  <span className="text-[10px] text-slate-400">Qty: {item.quantity || 1} &bull; <strong className="text-[#FF8C38]">{st.store}</strong></span>
                                 </div>
                               </div>
                               <span className="font-extrabold text-xs text-slate-900 shrink-0 ml-2">
@@ -352,7 +352,7 @@ export default function SavedBasketDetailPage() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-emerald-600" />
+                <UserPlus className="w-5 h-5 text-[#FF8C38]" />
                 <h3 className="text-lg font-black text-slate-900">Add Collaborator</h3>
               </div>
               <button onClick={() => setShowInviteModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
@@ -365,7 +365,7 @@ export default function SavedBasketDetailPage() {
               placeholder="Search user by username..." 
               value={searchUserQuery} 
               onChange={handleUserSearch} 
-              className="rounded-xl border-slate-200 focus-visible:ring-emerald-500 font-medium" 
+              className="rounded-xl border-slate-200 focus-visible:ring-[#FF8C38] font-medium"
             />
 
             {users.length > 0 && (
@@ -376,7 +376,7 @@ export default function SavedBasketDetailPage() {
                     <Button 
                       onClick={() => inviteUser(u)} 
                       size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs px-4"
+                      className="bg-[#FF8C38] hover:brightness-95 text-white font-bold rounded-xl text-xs px-4"
                     >
                       Invite
                     </Button>

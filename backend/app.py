@@ -265,12 +265,10 @@ def seed_database():
             db.session.add(Store(**s_data))
 
     categories = [
-        {'name': 'Dairy & Fresh Milk', 'description': 'Milk, butter, cheese, and yogurt'},
-        {'name': 'Fruits & Juices', 'description': 'Fresh fruit and fruit juices'},
-        {'name': 'Pantry Staples', 'description': 'Rice, pasta, oil, sugar, and flour'},
-        {'name': 'Bakery & Breads', 'description': 'Fresh baked breads and rolls'},
-        {'name': 'Snacks & Treats', 'description': 'Chips, chocolates, and biscuits'},
-        {'name': 'Meat & Poultry', 'description': 'Chicken, beef, steak, and mince'}
+        {'name': 'Grocery', 'description': 'All grocery items including pantry staples, snacks, and beverages.'},
+        {'name': 'Liquor', 'description': 'Alcoholic beverages and spirits.'},
+        {'name': 'Pharmacy', 'description': 'Medicines, health products, and personal care items.'},
+        {'name': 'Electronics', 'description': 'Electronic devices and accessories.'}
     ]
     for c_data in categories:
         if not Category.query.filter_by(name=c_data['name']).first():
@@ -932,10 +930,10 @@ def favicon(): return '', 204
 @app.route('/api/search', methods=['GET'])
 @check_active_status
 def handle_search():
-    query = request.args.get('q', '').strip().lower()
+    query = (request.args.get('q') or request.args.get('category') or 'all').strip().lower()
+    category_filter = request.args.get('category', 'all').strip().lower()
     store_filter = request.args.get('store', 'all').strip().lower()
     sort_option = request.args.get('sort', '').strip().lower()
-    if not query: return jsonify([])
 
     # Log Search to populate SearchHistory with 5-second deduplication guard
     try:
@@ -1013,6 +1011,26 @@ def handle_search():
 
     if sort_option in ['asc', 'price_asc', 'low_to_high']: combined.sort(key=lambda x: x['price'])
     elif sort_option in ['desc', 'price_desc', 'high_to_low']: combined.sort(key=lambda x: x['price'], reverse=True)
+
+    if category_filter and category_filter != 'all':
+        category_keywords = {
+            'liquor': ('vodka', 'whisky', 'whiskey', 'gin', 'beer', 'cider', 'wine', 'rum', 'brandy', 'tequila', 'liqueur', 'alcohol', 'savanna', 'heineken', 'smirnoff', 'amarula', 'castle'),
+            'pharmacy': ('panado', 'paracetamol', 'aspirin', 'flu', 'cough', 'vitamin', 'plaster', 'bandage', 'medicine', 'medication', 'tablets', 'capsule', 'soap'),
+            'electronics': ('battery', 'batteries', 'kettle', 'iron', 'toaster', 'cable', 'charger', 'usb', 'plug', 'tv', 'phone', 'speaker', 'headphone', 'microwave')
+        }
+
+        def product_category(product):
+            product_category_name = (product.get('category') or '').strip().lower()
+            if product_category_name in ['grocery', 'liquor', 'pharmacy', 'electronics']:
+                return product_category_name
+            name = (product.get('name') or '').lower()
+            for name_category, keywords in category_keywords.items():
+                if any(keyword in name for keyword in keywords):
+                    return name_category
+            return 'grocery'
+
+        combined = [product for product in combined if product_category(product) == category_filter]
+
     return jsonify(combined)
 
 @app.route('/api/categories', methods=['GET'])

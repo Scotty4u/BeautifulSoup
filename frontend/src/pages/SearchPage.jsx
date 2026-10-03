@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useEffectEvent } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import SkeletonCard from '../components/SkeletonCard';
@@ -83,24 +83,21 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const query = searchParams.get('q') || searchParams.get('query') || '';
+  const category = searchParams.get('category') || '';
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const resolveCategories = (q, state) => {
+  const resolveCategories = (q, selectedCategory, state) => {
     if (state?.selectedCategories) return state.selectedCategories;
+    const matchingCategory = ALL_CATEGORIES.find(cat => cat.toLowerCase() === selectedCategory?.toLowerCase());
+    if (matchingCategory) return [matchingCategory];
     if (q && q !== 'deals' && q !== 'all') {
       return [detectCategory(q)];
     }
     return ALL_CATEGORIES;
   };
 
-  const [selectedCategories, setSelectedCategories] = useState(() =>
-    resolveCategories(query, location.state)
-  );
-
-  useEffect(() => {
-    setSelectedCategories(resolveCategories(query, location.state));
-  }, [query, location.state]);
+  const selectedCategories = resolveCategories(query, category, location.state);
 
   const [selectedStores, setSelectedStores] = useState({
     Checkers: true,
@@ -115,39 +112,53 @@ export default function SearchPage() {
   const itemsPerPage = 20;
 
   const { showToast } = useToast();
+  const showSearchError = useEffectEvent(() => showToast("Failed to fetch search results.", "error"));
 
   useEffect(() => {
-    if (!query) return;
-    setLoading(true);
-    setCurrentPage(1);
-    
-    axios.get(`/api/search?q=${encodeURIComponent(query)}`, { withCredentials: true })
+    const searchQuery = query || category || 'all';
+    const searchCategory = category || 'all';
+    const controller = new AbortController();
+
+    Promise.resolve().then(() => {
+      setLoading(true);
+      setCurrentPage(1);
+      return axios.get(`/api/search?q=${encodeURIComponent(searchQuery)}&category=${encodeURIComponent(searchCategory)}`, {
+        withCredentials: true,
+        signal: controller.signal
+      });
+    })
       .then(res => {
         setResults(res.data || []);
         setLoading(false);
       })
       .catch(() => {
+        if (controller.signal.aborted) return;
         setResults([]);
         setLoading(false);
-        showToast("Failed to fetch search results.", "error");
+        showSearchError();
       });
-  }, [query]);
+
+    return () => controller.abort();
+  }, [query, category]);
 
   const activeCategory = useMemo(() => {
-    return detectCategory(query, results);
-  }, [query, results]);
+    return ALL_CATEGORIES.find(cat => cat.toLowerCase() === category.toLowerCase()) || detectCategory(query, results);
+  }, [query, category, results]);
 
   const filteredResults = useMemo(() => {
     return results.filter(product => {
       if (selectedStores[product.store] === false) return false;
       if (product.price > maxPrice) return false;
+      const productCategory = ALL_CATEGORIES.find(cat => cat.toLowerCase() === product.category?.toLowerCase())
+        || detectCategory(product.name, [product]);
+      if (!selectedCategories.some(cat => cat.toLowerCase() === productCategory.toLowerCase())) return false;
       return true;
     }).sort((a, b) => {
       if (sortBy === 'price-low') return a.price - b.price;
       if (sortBy === 'price-high') return b.price - a.price;
       return 0;
     });
-  }, [results, selectedStores, maxPrice, sortBy]);
+  }, [results, selectedStores, maxPrice, sortBy, selectedCategories]);
 
   const totalItems = filteredResults.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
@@ -196,7 +207,7 @@ export default function SearchPage() {
             Results for "{query || 'All Items'}"
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Category: <strong className="text-[#2E7D32]">{activeCategory}</strong> • Found {totalItems} matching products across stores.
+            Category: <strong className="text-[#FF8C38]">{activeCategory}</strong> • Found {totalItems} matching products across stores.
           </p>
         </div>
 

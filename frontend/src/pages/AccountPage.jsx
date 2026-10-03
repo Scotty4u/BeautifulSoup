@@ -27,8 +27,8 @@ const ACTION_CARDS = [
     description: 'View, edit, and reload your custom grocery lists and past price comparisons.',
     route: '/saved',
     label: 'Open Baskets',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
+    color: 'text-[#FF8C38]',
+    bg: 'bg-[#FFF3EB]',
   },
   {
     icon: Users,
@@ -114,7 +114,7 @@ export default function AccountPage() {
               <div style={{justifyItems:"center", width:"75%"}}>        
                 <Button
                       onClick={() => navigate('/login')}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl shadow-md shadow-emerald-200"
+                      className="w-full bg-[#FF8C38] hover:brightness-95 text-white font-bold h-11 rounded-xl shadow-md"
                       style={{width:"100%", marginBottom:"2%"}}
                       >
                       <i class="fa fa-sign-in" aria-hidden="true"></i>
@@ -124,7 +124,7 @@ export default function AccountPage() {
                 <Button
                       variant="outline"
                       onClick={() => navigate('/signup')}
-                      className="w-full font-bold h-11 rounded-xl border-slate-200 hover:bg-slate-50 hover:border-emerald-300 hover:text-emerald-700"
+                      className="w-full font-bold h-11 rounded-xl border-slate-200 hover:bg-[#FFF3EB] hover:border-[#FF8C38] hover:text-[#FF8C38]"
                       style={{width:"100%"}}
                       >
                       <i class="fa fa-user-plus" aria-hidden="true"></i>
@@ -141,8 +141,8 @@ export default function AccountPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <Card className="w-full max-w-md border-0 shadow-xl shadow-slate-200/80">
           <CardContent className="p-10 text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto">
-              <User className="w-10 h-10 text-emerald-600"  style={{colour:"black"}}/>
+            <div className="w-20 h-20 rounded-full bg-[#FFF3EB] flex items-center justify-center mx-auto">
+              <User className="w-10 h-10 text-[#FF8C38]"  style={{colour:"black"}}/>
             </div>
             <div className="space-y-2">
               <h1 className="text-2xl font-black text-slate-900">Welcome to SmartBasket</h1>
@@ -153,7 +153,7 @@ export default function AccountPage() {
             <div className="flex flex-col gap-3">
               <Button
                 onClick={() => navigate('/login')}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl shadow-md shadow-emerald-200"
+                className="w-full bg-[#FF8C38] hover:brightness-95 text-white font-bold h-11 rounded-xl shadow-md"
               >
                 <LogIn className="w-4 h-4 mr-2" />
                 Sign In
@@ -161,7 +161,7 @@ export default function AccountPage() {
               <Button
                 variant="outline"
                 onClick={() => navigate('/signup')}
-                className="w-full font-bold h-11 rounded-xl border-slate-200 hover:bg-slate-50 hover:border-emerald-300 hover:text-emerald-700"
+                className="w-full font-bold h-11 rounded-xl border-slate-200 hover:bg-[#FFF3EB] hover:border-[#FF8C38] hover:text-[#FF8C38]"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Create Account
@@ -194,7 +194,7 @@ export default function AccountPage() {
 
               {/* Avatar */}
               <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-200">
+                <div className="w-20 h-20 rounded-full bg-[#FF8C38] flex items-center justify-center shadow-lg shadow-[#FF8C38]/20">
                   <span className="text-2xl font-black text-white">{initials}</span>
                 </div>
                 {user.is_admin && (
@@ -211,7 +211,7 @@ export default function AccountPage() {
                   variant="secondary"
                   className={user.is_admin
                     ? 'bg-amber-100 text-amber-700 font-bold text-xs'
-                    : 'bg-emerald-100 text-emerald-700 font-bold text-xs'
+                    : 'bg-[#FFF3EB] text-[#FF8C38] font-bold text-xs'
                   }
                 >
                   {user.is_admin ? '⭐ Admin' : 'Free Account'}
@@ -251,7 +251,7 @@ export default function AccountPage() {
             {ACTION_CARDS.map(({ icon: Icon, title, description, route, label, color, bg }) => (
               <Card
                 key={route}
-                className="border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer group"
+                className="border border-slate-200 hover:border-[#FF8C38] hover:shadow-md transition-all cursor-pointer group"
                 onClick={() => navigate(route)}
               >
                 <CardContent className="p-5 flex items-center gap-4">
@@ -264,7 +264,7 @@ export default function AccountPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className={`text-sm font-bold hidden sm:block ${color}`}>{label}</span>
-                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-[#FF8C38] transition-colors" />
                   </div>
                 </CardContent>
               </Card>

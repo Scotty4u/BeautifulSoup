@@ -21,12 +21,10 @@ const STORE_INFO = {
 };
 
 const ALL_CATEGORIES = [
-  'Dairy & Fresh Milk', 
-  'Fruits & Juices', 
-  'Pantry Staples', 
-  'Bakery & Breads', 
-  'Snacks & Treats', 
-  'Meat & Poultry'
+  'Grocery',
+  'Pharmacy',
+  'Liquor',
+  'Electronics'
 ];
 
 function StoreBadge({ store }) {
@@ -78,7 +76,7 @@ export default function Home() {
           {ALL_CATEGORIES.map((cat) => (
             <button
               key={cat}
-              onClick={() => navigate(`/search?category=${encodeURIComponent(cat.toLowerCase())}`, {
+              onClick={() => navigate(`/search?q=${encodeURIComponent(cat.toLowerCase())}&category=${encodeURIComponent(cat.toLowerCase())}`, {
                 state: { selectedCategories: [cat] }
               })}
               className="text-sm font-semibold text-slate-700 hover:text-[#FF8C38] transition-colors whitespace-nowrap cursor-pointer"

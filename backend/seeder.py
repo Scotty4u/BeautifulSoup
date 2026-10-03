@@ -8,19 +8,19 @@ def seed_initial_data():
     
     print("🌱 [Auto-Seeder] Populating Front Page & Categories in the background...")
     
-    # Map staples to their respective database category names
+    # Map each staple to its top-level platform category
     staples_with_categories = [
-        ("milk", "Dairy & Fresh Milk"),
-        ("butter", "Dairy & Fresh Milk"),
-        ("cheese", "Dairy & Fresh Milk"),
-        ("bread", "Bakery & Breads"),
-        ("eggs", "Dairy & Fresh Milk"),
-        ("chicken", "Meat & Poultry"),
-        ("rice", "Pantry Staples"),
-        ("sugar", "Pantry Staples"),
-        ("cooking oil", "Pantry Staples"),
-        ("juice", "Fruits & Juices"),
-        ("coca cola", "Snacks & Treats")
+        ("milk", "Grocery"),
+        ("butter", "Grocery"),
+        ("cheese", "Grocery"),
+        ("bread", "Grocery"),
+        ("eggs", "Grocery"),
+        ("chicken", "Grocery"),
+        ("rice", "Grocery"),
+        ("sugar", "Grocery"),
+        ("cooking oil", "Grocery"),
+        ("juice", "Grocery"),
+        ("coca cola", "Grocery")
     ]
     
     with app.app_context():
