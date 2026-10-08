@@ -42,6 +42,9 @@ function NavigationBar({ cartCount }) {
   const { user } = useAuth(); // Consume global user state instantly without reloading
   const navigate = useNavigate();
 
+  // 🔴 NEW: Check multiple possible admin flags depending on how your backend sends the user object
+  const isAdmin = user?.is_admin || user?.isAdmin || user?.role === 'admin';
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -97,7 +100,9 @@ function NavigationBar({ cartCount }) {
 
         {/* 3. Desktop Navigation Icons */}
         <div className="hidden md:flex items-center gap-2">
-          {user?.is_admin && (
+          
+          {/* 🔴 UPDATED: Uses the new isAdmin check */}
+          {isAdmin && (
             <NavLink 
               to="/admin" 
               className={({ isActive }) => `flex items-center gap-1.5 px-3.5 py-2 rounded-2xl font-bold text-xs transition-all border ${
@@ -159,7 +164,9 @@ function NavigationBar({ cartCount }) {
           </form>
 
           <div className="flex flex-col gap-1">
-            {user?.is_admin && (
+            
+            {/* 🔴 UPDATED: Uses the new isAdmin check */}
+            {isAdmin && (
               <NavLink 
                 to="/admin" 
                 onClick={() => setMobileMenuOpen(false)}
@@ -205,12 +212,16 @@ function NavigationBar({ cartCount }) {
 // Protected route wrapper using the global AuthContext
 function AdminRoute({ children }) {
   const { user, loading } = useAuth();
+  
+  // 🔴 NEW: Applies the same multi-flag admin check here to secure the route
+  const isAdmin = user?.is_admin || user?.isAdmin || user?.role === 'admin';
 
   if (loading) {
     return <div className="py-20 text-center font-bold text-slate-500">Checking security clearance...</div>;
   }
 
-  return user && user.is_admin ? children : <Navigate to="/" replace />;
+  // 🔴 UPDATED: Uses the isAdmin variable
+  return user && isAdmin ? children : <Navigate to="/" replace />;
 }
 
 // --- MAIN SHELL ---

@@ -7,23 +7,40 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check session status on mount / page refresh
-  const checkUserSession = () => {
+  // Check session status from Flask backend (/api/me)
+  const checkUserSession = async () => {
     setLoading(true);
-    axios.get('http://localhost:5000/api/me', { withCredentials: true })
-      .then(res => {
-        if (res.data && res.data.authenticated) {
-          setUser(res.data);
-        } else {
-          setUser(null);
-        }
-      })
-      .catch(() => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/me', { withCredentials: true });
+      if (res.data && res.data.authenticated) {
+        setUser(res.data.user || res.data);
+        return res.data.user || res.data;
+      } else {
         setUser(null);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+        return null;
+      }
+    } catch (error) {
+      setUser(null);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Call this directly on successful login to set user state instantly
+  const loginUser = (userData) => {
+    setUser(userData);
+  };
+
+  // Call this on logout
+  const logoutUser = async () => {
+    try {
+      await axios.post('http://localhost:5000/api/logout', {}, { withCredentials: true });
+    } catch (err) {
+      console.error("Logout failed", err);
+    } finally {
+      setUser(null);
+    }
   };
 
   useEffect(() => {
@@ -31,7 +48,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, checkUserSession }}>
+    <AuthContext.Provider value={{ user, setUser, loading, checkUserSession, loginUser, logoutUser }}>
       {children}
     </AuthContext.Provider>
   );
