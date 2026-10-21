@@ -22,9 +22,16 @@ ENV/
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+backend/instance/
 
 # Category databases
 databases/
+
+# Local backups
+*.bak
 
 # ============================================================
 # Logs (System & Package Managers)

@@ -68,7 +68,7 @@ export default function OnboardingPage() {
     const formData = new FormData();
     selected.forEach(s => formData.append('preferred_stores', s));
 
-    axios.post('http://localhost:5000/onboarding', formData, { withCredentials: true })
+    axios.post('/onboarding', formData, { withCredentials: true })
       .then(() => navigate('/account'))
       .catch(() => navigate('/account'))
       .finally(() => setSaving(false));
@@ -78,7 +78,6 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg space-y-6">
 
-        {/* Header */}
         <div className="text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-emerald-600 flex items-center justify-center mx-auto shadow-lg shadow-emerald-200">
             <ShoppingCart className="w-7 h-7 text-white" />
@@ -89,7 +88,6 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        {/* Store Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {STORES.map(store => {
             const isSelected = selected.includes(store.id);
@@ -104,7 +102,6 @@ export default function OnboardingPage() {
                     : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                   }`}
               >
-                {/* Checkmark */}
                 {isSelected && (
                   <div className={`absolute top-3 right-3 w-6 h-6 rounded-full ${store.check} flex items-center justify-center shadow`}>
                     <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
@@ -121,7 +118,6 @@ export default function OnboardingPage() {
           })}
         </div>
 
-        {/* Selected summary */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-slate-400 font-medium">Selected:</span>
           {selected.map(s => (
@@ -134,7 +130,6 @@ export default function OnboardingPage() {
         {/* Error */}
         {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
 
-        {/* Submit */}
         <Button
           onClick={handleSubmit}
           disabled={saving || selected.length === 0}

@@ -1,0 +1,11 @@
+/* Targeted mobile fixes. Avoid global button widths that break desktop layout. */
+.sb-safe-product-actions > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.sb-safe-product-actions button { min-height: 44px; flex-shrink: 0; }
+.sb-product-main-actions > * { min-width: 0; }
+@media (max-width: 390px) {
+  .sb-safe-product-actions { align-items: stretch; }
+  .sb-safe-product-actions > :first-child { flex: 1 1 100%; }
+  .sb-safe-product-actions > button { flex: 1 1 100%; width: 100%; }
+  .sb-product-main-actions { flex-direction: column; }
+  .sb-product-main-actions > button { width: 100%; white-space: normal; height: auto; min-height: 48px; line-height: 1.35; }
+}

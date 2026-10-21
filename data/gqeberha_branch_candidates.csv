@@ -1,0 +1,25 @@
+retailer,branch,address_or_landmark,locality,latitude,longitude,verification_status,evidence_url
+Checkers,Checkers Greenacres,"Greenacres Centre, Ring Road / La Rochelle Road",Greenacres,,,address_listed_needs_osm_coordinate,https://www.waze.com/live-map/directions/za/ec/gqeberha/checkers-greenacres?to=place.ChIJc07xVc3Teh4RmzEJj22axvY
+Checkers,Checkers Metlife Plaza,"Metlife Plaza Centre, Samantha Way",Kabega Park,,,address_listed_needs_osm_coordinate,https://www.waze.com/live-map/directions/za/ec/gqeberha/checkers-metlife-plaza?to=place.ChIJwxfD--fQeh4RzCVD_JdB1fU
+Checkers,Checkers Moffett-on-Main,"Moffett-on-Main Lifestyle Centre, 109 17th Avenue",Greenshields Park,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/checkers/gqeberha/
+Checkers,Checkers Lorraine,Verdun Road,Lorraine,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/checkers/gqeberha/
+Checkers,Checkers Boardwalk PE,"Boardwalk Mall, Marine Drive",Summerstrand,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/checkers/gqeberha/
+Checkers,Checkers 6th Avenue,"6th Avenue Centre",Walmer,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/checkers/gqeberha/
+Checkers,Checkers Hyper Baywest,"Baywest Mall, Baywest Boulevard",Gqeberha,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/checkers/gqeberha/
+Shoprite,Shoprite Pier 14,"Pier 14 Centre, Lavinia Street",North End,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/shoprite/gqeberha/
+Shoprite,Shoprite Govan Mbeki,"54-60 Govan Mbeki Street",Central,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/shoprite/gqeberha/
+Shoprite,Shoprite Bethelsdorp,"Cleary Park Shopping Centre, Stanford Road",Hillside,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/shoprite/gqeberha/
+Shoprite,Shoprite Stanford Quarter,"Stanford Quarter Mall, Stanford Road",Korsten,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/shoprite/gqeberha/
+Shoprite,Shoprite Hyper Greenacres,"Greenacres Shopping Centre, 1 Ring Road",Greenacres,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/shoprite/gqeberha/
+Shoprite,Shoprite Motherwell,Motherwell Shopping Complex,Motherwell,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/shoprite/gqeberha/
+Shoprite,Shoprite New Brighton,"New Brighton Plaza, Tladi and Dubu Streets",New Brighton,,,address_listed_needs_osm_coordinate,https://nearme.co.za/brands/shoprite/gqeberha/
+Pick n Pay,Pick n Pay Boardwalk,"Boardwalk Mall, Marine Drive",Summerstrand,,,address_listed_needs_osm_coordinate,
+Pick n Pay,Pick n Pay Summerstrand,8th Avenue,Summerstrand,,,address_listed_needs_osm_coordinate,
+Pick n Pay,Pick n Pay Newton Park,"Sanlam Centre, 4th Avenue",Newton Park,,,address_listed_needs_osm_coordinate,
+Pick n Pay,Pick n Pay Family Heugh Road,108 Heugh Road,Walmer,,,address_listed_needs_osm_coordinate,
+Pick n Pay,Pick n Pay Hypermarket Moffett Park,"Moffett Retail Park, William Moffett Expressway",Fairview,,,address_listed_needs_osm_coordinate,
+Woolworths,Woolworths Food Access Park,"Access Retail Park, Buffelsfontein Road and Newcombe Avenue",Walmer,,,address_listed_needs_osm_coordinate,https://www.woolworths.co.za/storelocator
+Woolworths,Woolworths Food Boardwalk,"Boardwalk Mall, Marine Drive",Summerstrand,,,address_listed_needs_osm_coordinate,https://www.woolworths.co.za/storelocator
+Woolworths,Woolworths Sunridge Village,"Sunridge Village Shopping Centre, Aster Avenue and Kragga Kamma Road",Sunridge Park,,,address_listed_needs_osm_coordinate,https://www.woolworths.co.za/storelocator
+Woolworths,Woolworths Food PE Gardens,"PE Gardens Shopping Centre, Circular Drive",Lorraine,,,address_listed_needs_osm_coordinate,https://www.woolworths.co.za/storelocator
+Woolworths,Woolworths Foodstop Engen Linton Grange,1 Bramlin Street,Linton Grange,,,address_listed_needs_osm_coordinate,https://www.woolworths.co.za/storelocator

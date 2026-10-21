@@ -121,3 +121,40 @@ body {
   from { transform: translateX(120%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+/* =========================================
+   Search View Theme Fixes (Green Overrides)
+   ========================================= */
+
+/* Active Category Pill (replaces orange active states) */
+.pill-active,
+.category-pill.active {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+}
+
+/* "Best Deal" Badges & Tags (replaces orange badges) */
+.badge-deal,
+.deal-tag {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #10b981 !important;
+}
+
+/* Price Range Slider Track & Accent */
+input[type="range"] {
+  accent-color: #059669;
+}
+
+/* Secondary interactive utilities for search page elements */
+.border-accent-orange {
+  border-color: #059669 !important;
+}
+
+.text-accent-orange {
+  color: #059669 !important;
+}
+
+.bg-accent-orange {
+  background-color: #059669 !important;
+}

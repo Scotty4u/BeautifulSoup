@@ -8,7 +8,6 @@ def seed_initial_data():
     
     print("🌱 [Auto-Seeder] Populating Front Page & Categories in the background...")
     
-    # Map staples to their respective database category names
     staples_with_categories = [
         ("milk", "Dairy & Fresh Milk"),
         ("butter", "Dairy & Fresh Milk"),
@@ -27,7 +26,6 @@ def seed_initial_data():
         for query, cat_name in staples_with_categories:
             print(f"🛒 [Auto-Seeder] Fetching items for: {query} -> [{cat_name}]...")
             
-            # Find the category ID from the database
             category_record = Category.query.filter_by(name=cat_name).first()
             category_id = category_record.id if category_record else None
             
@@ -60,7 +58,6 @@ def seed_initial_data():
                         formatted_price=item.get('formattedPrice', f"R {price_val:.2f}"),
                         image_url=item.get('imageUrl', '')
                     )
-                    # merge() prevents unique constraint crashes on shared IDs
                     db.session.merge(new_p)
 
                     # Generate 14 days of synthetic price history for charts

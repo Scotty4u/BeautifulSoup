@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   const checkUserSession = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/me', { withCredentials: true });
+      const res = await axios.get('/api/me', { withCredentials: true });
       if (res.data && res.data.authenticated) {
         setUser(res.data.user || res.data);
         return res.data.user || res.data;
@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
   // Call this on logout
   const logoutUser = async () => {
     try {
-      await axios.post('http://localhost:5000/api/logout', {}, { withCredentials: true });
+      await axios.post('/api/logout', {}, { withCredentials: true });
     } catch (err) {
       console.error("Logout failed", err);
     } finally {

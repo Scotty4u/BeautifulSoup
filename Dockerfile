@@ -1,58 +1,47 @@
-FROM python:3.11-slim
+# Build SmartBasket's React frontend and Flask backend into one Railway service.
+# Run this Dockerfile from the BeautifulSoup/ project directory.
 
-WORKDIR /app
-
-# Install system dependencies required by Playwright and build tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libffi-dev \
-    libssl-dev \
-    curl \
-    git \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libgbm1 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
-    ca-certificates \
-    fonts-liberation \
-    libasound2 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy and install python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install only the Chromium browser binary
-RUN playwright install chromium
-
-# Copy the rest of the application code
+# --------------------------- React frontend ---------------------------
+FROM node:22-bookworm-slim AS react-builder
+WORKDIR /source
 COPY . .
 
-# Expose web port
-EXPOSE 5000
+# Support a React package.json in frontend/ (usual layout) or at project root.
+RUN set -eu; \
+    if [ -f frontend/package.json ]; then \
+        cd frontend; \
+    elif [ -f package.json ]; then \
+        cd /source; \
+    else \
+        echo 'ERROR: React package.json not found in frontend/ or project root'; \
+        exit 1; \
+    fi; \
+    if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; \
+    else npm install --no-audit --no-fund; fi; \
+    npm run build; \
+    mkdir -p /react-output; \
+    if [ -f dist/index.html ]; then \
+        cp -a dist/. /react-output/; \
+    elif [ -f build/index.html ]; then \
+        cp -a build/. /react-output/; \
+    else \
+        echo 'ERROR: React build completed without dist/index.html or build/index.html'; \
+        exit 1; \
+    fi
 
-# Run production WSGI server via Gunicorn with 1 worker for SQLite safety
-CMD gunicorn app:app --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 120
+# --------------------------- Flask backend ----------------------------
+FROM python:3.11-slim-bookworm
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m playwright install --with-deps chromium
+
+COPY . .
+COPY --from=react-builder /react-output/ /app/frontend/dist/
+
+# The Railway service's public domain target port is 8080.
+EXPOSE 8080
+CMD ["sh", "-c", "exec gunicorn --chdir /app/backend app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 4 --timeout 120"]
